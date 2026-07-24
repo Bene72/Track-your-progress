@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase'
 const NAV = [
   { href: '/dashboard', label: 'Aujourd\'hui', icon: HomeIcon },
   { href: '/dashboard/wod', label: 'WOD', icon: BoardIcon },
+  { href: '/dashboard/calendar', label: 'Calendrier', icon: CalendarIcon },
   { href: '/dashboard/pr', label: 'Mes PR', icon: TrophyIcon },
   { href: '/dashboard/box', label: 'Ma box', icon: UsersIcon },
 ]
@@ -15,6 +16,9 @@ function HomeIcon({ active }) {
 }
 function BoardIcon({ active }) {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.8}><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/><line x1="7" y1="17" x2="13" y2="17"/></svg>
+}
+function CalendarIcon({ active }) {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.8}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
 }
 function TrophyIcon({ active }) {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.8}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 9c0 3.31 2.69 6 6 6s6-2.69 6-6"/><path d="M9 22h6"/><path d="M12 15v7"/><path d="M6 2H2l4 7"/><path d="M18 2h4l-4 7"/></svg>
