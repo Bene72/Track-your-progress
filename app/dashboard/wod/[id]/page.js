@@ -1,0 +1,68 @@
+'use client'
+import { useState, useEffect, useCallback } from 'react'
+import { useParams } from 'next/navigation'
+import { supabase } from '../../../../lib/supabase'
+import { useCurrentUser } from '../../../../lib/hooks/useCurrentUser'
+import WodCard from '../../../../components/WodCard'
+import ScoreForm from '../../../../components/ScoreForm'
+import Leaderboard from '../../../../components/Leaderboard'
+
+export default function WodDetailPage() {
+  const { id } = useParams()
+  const { userId } = useCurrentUser({ redirectIfNull: true })
+  const [wod, setWod] = useState(null)
+  const [scores, setScores] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const [{ data: wodRow }, { data: scoreRows }] = await Promise.all([
+      supabase.from('wods').select('*').eq('id', id).single(),
+      supabase.from('wod_scores').select('*, profiles ( full_name )').eq('wod_id', id),
+    ])
+    setWod(wodRow || null)
+    setScores(scoreRows || [])
+    setLoading(false)
+  }, [id])
+
+  useEffect(() => { load() }, [load])
+
+  if (loading) return <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>
+  if (!wod) return <div className="card empty">WOD introuvable.</div>
+
+  const myScore = scores.find(s => s.user_id === userId) || null
+
+  const handleSubmit = async (payload) => {
+    const { error } = await supabase.from('wod_scores')
+      .upsert({ ...payload, wod_id: wod.id, box_id: wod.box_id, user_id: userId }, { onConflict: 'wod_id,user_id' })
+    if (error) throw error
+    setEditing(false)
+    await load()
+  }
+
+  return (
+    <div className="stack">
+      <WodCard wod={wod} />
+
+      {myScore && !editing ? (
+        <div className="card">
+          <div className="row" style={{ marginBottom: 4 }}>
+            <span className="eyebrow" style={{ color: 'var(--rx)' }}>Ton score</span>
+            <button className="btn btnGhost btnSm" onClick={() => setEditing(true)}>Modifier</button>
+          </div>
+        </div>
+      ) : (
+        <div className="card">
+          <h3 className="h2" style={{ fontSize: 18, marginBottom: 12 }}>{myScore ? 'Modifier mon score' : 'Poster mon score'}</h3>
+          <ScoreForm wod={wod} existingScore={myScore} onSubmit={handleSubmit} onCancel={myScore ? () => setEditing(false) : null} />
+        </div>
+      )}
+
+      <div className="card">
+        <h3 className="eyebrow" style={{ marginBottom: 8 }}>Classement ({scores.length})</h3>
+        <Leaderboard wod={wod} scores={scores} currentUserId={userId} />
+      </div>
+    </div>
+  )
+}
