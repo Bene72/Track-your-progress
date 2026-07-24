@@ -1,19 +1,23 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabase'
 import { useCurrentUser } from '../../../../lib/hooks/useCurrentUser'
+import { useBox } from '../../../../lib/hooks/useBox'
 import WodCard from '../../../../components/WodCard'
 import ScoreForm from '../../../../components/ScoreForm'
 import Leaderboard from '../../../../components/Leaderboard'
 
 export default function WodDetailPage() {
   const { id } = useParams()
+  const router = useRouter()
   const { userId } = useCurrentUser({ redirectIfNull: true })
+  const box = useBox()
   const [wod, setWod] = useState(null)
   const [scores, setScores] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -32,6 +36,8 @@ export default function WodDetailPage() {
   if (!wod) return <div className="card empty">WOD introuvable.</div>
 
   const myScore = scores.find(s => s.user_id === userId) || null
+  // Seul l'auteur du WOD ou le coach de la box peut le supprimer.
+  const canDelete = wod.created_by === userId || box.isCoach
 
   const handleSubmit = async (payload) => {
     const { error } = await supabase.from('wod_scores')
@@ -41,9 +47,33 @@ export default function WodDetailPage() {
     await load()
   }
 
+  const handleDelete = async () => {
+    if (!confirm(`Supprimer "${wod.title}" ? Cette action est irréversible.`)) return
+    setDeleting(true)
+    try {
+      const { error } = await supabase.from('wods').delete().eq('id', wod.id)
+      if (error) throw error
+      router.push('/dashboard/wod')
+    } catch (e) {
+      alert(e.message || 'Erreur lors de la suppression')
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="stack">
       <WodCard wod={wod} />
+
+      {canDelete && (
+        <button
+          className="btn btnGhost btnBlock"
+          style={{ color: 'var(--rx, #e5484d)', borderColor: 'rgba(229,72,77,0.4)' }}
+          onClick={handleDelete}
+          disabled={deleting}
+        >
+          {deleting ? 'Suppression...' : 'Supprimer ce WOD'}
+        </button>
+      )}
 
       {myScore && !editing ? (
         <div className="card">
