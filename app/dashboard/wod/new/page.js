@@ -7,6 +7,13 @@ import { useWodData } from '../../../../lib/hooks/useWodData'
 import { WOD_FORMATS, SCORING_TYPES, DEFAULT_SCORING, clockToSeconds } from '../../../../lib/constants'
 import { wodSchema, sanitizeText } from '../../../../lib/security'
 
+// Date du jour en HEURE LOCALE (et non UTC), pour éviter que le champ
+// "Date" soit pré-rempli avec la mauvaise journée entre minuit et ~2h du matin.
+function localDateKey(d = new Date()) {
+  const offset = d.getTimezoneOffset() * 60000
+  return new Date(d.getTime() - offset).toISOString().slice(0, 10)
+}
+
 export default function NewWodPage() {
   const router = useRouter()
   const { userId } = useCurrentUser({ redirectIfNull: true })
@@ -17,7 +24,7 @@ export default function NewWodPage() {
   const [format, setFormat] = useState('for_time')
   const [scoringType, setScoringType] = useState(DEFAULT_SCORING.for_time)
   const [description, setDescription] = useState('')
-  const [wodDate, setWodDate] = useState(new Date().toISOString().slice(0, 10))
+  const [wodDate, setWodDate] = useState(localDateKey())
   const [timeCap, setTimeCap] = useState('')
   const [emomInterval, setEmomInterval] = useState('60')
   const [emomRounds, setEmomRounds] = useState('')
