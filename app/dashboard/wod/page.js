@@ -29,7 +29,7 @@ export default function WodFeedPage() {
       )}
 
       {wodData.feed.length === 0 ? (
-        <div className="card empty">Aucun WOD publié pour l'instant.</div>
+        <div className="card empty">Aucun WOD publié pour l’instant.</div>
       ) : (
         <div className="stack" style={{ gap: 10 }}>
           {wodData.feed.map(w => (
