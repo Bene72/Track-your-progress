@@ -6,12 +6,7 @@ import { useBox } from '../../../../lib/hooks/useBox'
 import { useWodData } from '../../../../lib/hooks/useWodData'
 import { WOD_FORMATS, SCORING_TYPES, DEFAULT_SCORING, clockToSeconds } from '../../../../lib/constants'
 import { wodSchema, sanitizeText } from '../../../../lib/security'
-
-// Date du jour en HEURE LOCALE (et non UTC).
-function localDateKey(d = new Date()) {
-  const offset = d.getTimezoneOffset() * 60000
-  return new Date(d.getTime() - offset).toISOString().slice(0, 10)
-}
+import { localDateKey } from '../../../../lib/date'
 
 export default function NewWodPage() {
   const router = useRouter()
