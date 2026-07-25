@@ -1,7 +1,6 @@
 'use client'
 import { useState } from 'react'
 import { useCurrentUser } from '../../../lib/hooks/useCurrentUser'
-import { useBox } from '../../../lib/hooks/useBox'
 import { usePrData } from '../../../lib/hooks/usePrData'
 import { PR_VALUE_TYPES, formatSecondsToClock, clockToSeconds } from '../../../lib/constants'
 import { prSchema, sanitizeText } from '../../../lib/security'
@@ -75,7 +74,6 @@ function AddPrForm({ onSubmit, onDone }) {
 
 export default function PrPage() {
   const { userId } = useCurrentUser({ redirectIfNull: true })
-  const box = useBox()
   const pr = usePrData(userId)
   const [showForm, setShowForm] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
