@@ -18,6 +18,7 @@ export default function WodDetailPage() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -50,12 +51,13 @@ export default function WodDetailPage() {
   const handleDelete = async () => {
     if (!confirm(`Supprimer "${wod.title}" ? Cette action est irréversible.`)) return
     setDeleting(true)
+    setDeleteError(null)
     try {
       const { error } = await supabase.from('wods').delete().eq('id', wod.id)
       if (error) throw error
       router.push('/dashboard/wod')
     } catch (e) {
-      alert(e.message || 'Erreur lors de la suppression')
+      setDeleteError(e.message || 'Erreur lors de la suppression')
       setDeleting(false)
     }
   }
@@ -65,14 +67,17 @@ export default function WodDetailPage() {
       <WodCard wod={wod} />
 
       {canDelete && (
-        <button
-          className="btn btnGhost btnBlock"
-          style={{ color: 'var(--rx, #e5484d)', borderColor: 'rgba(229,72,77,0.4)' }}
-          onClick={handleDelete}
-          disabled={deleting}
-        >
-          {deleting ? 'Suppression...' : 'Supprimer ce WOD'}
-        </button>
+        <>
+          <button
+            className="btn btnGhost btnBlock"
+            style={{ color: 'var(--rx, #e5484d)', borderColor: 'rgba(229,72,77,0.4)' }}
+            onClick={handleDelete}
+            disabled={deleting}
+          >
+            {deleting ? 'Suppression...' : 'Supprimer ce WOD'}
+          </button>
+          {deleteError && <div className="errorBox">{deleteError}</div>}
+        </>
       )}
 
       {myScore && !editing ? (
