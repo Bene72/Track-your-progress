@@ -102,7 +102,7 @@ export default function BoxPage() {
       {box.isCoach && (
         <div className="card">
           <div className="row" style={{ marginBottom: 8 }}>
-            <h3 className="eyebrow">Codes d'invitation</h3>
+            <h3 className="eyebrow">Codes d’invitation</h3>
           </div>
           <div className="row" style={{ marginBottom: 12, gap: 8 }}>
             <select className="input" value={inviteDays} onChange={e => setInviteDays(Number(e.target.value))}>
