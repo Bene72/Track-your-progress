@@ -2,6 +2,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
+import { BoxProvider, useBoxContext } from '../../lib/context/BoxContext'
 
 const NAV = [
   { href: '/dashboard', label: 'Aujourd\'hui', icon: HomeIcon },
@@ -27,6 +28,16 @@ function UsersIcon({ active }) {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.8}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
 }
 
+function BoxErrorBanner() {
+  const { error } = useBoxContext()
+  if (!error) return null
+  return (
+    <div className="errorBox" style={{ margin: '12px 16px 0' }} role="alert">
+      {error}
+    </div>
+  )
+}
+
 export default function DashboardLayout({ children }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -37,26 +48,30 @@ export default function DashboardLayout({ children }) {
   }
 
   return (
-    <div className="shell">
-      <nav className="topnav">
-        <Link href="/dashboard" className="logo">BOX<span>LOG</span></Link>
-        <button className="btn btnGhost btnSm" onClick={handleLogout} aria-label="Se déconnecter">Déconnexion</button>
-      </nav>
+    <BoxProvider>
+      <div className="shell">
+        <nav className="topnav">
+          <Link href="/dashboard" className="logo">BOX<span>LOG</span></Link>
+          <button className="btn btnGhost btnSm" onClick={handleLogout} aria-label="Se déconnecter">Déconnexion</button>
+        </nav>
 
-      <main className="main">{children}</main>
+        <BoxErrorBanner />
 
-      <nav className="mobileNav" aria-label="Navigation">
-        {NAV.map(n => {
-          const active = n.href === '/dashboard' ? pathname === n.href : pathname.startsWith(n.href)
-          const Icon = n.icon
-          return (
-            <Link key={n.href} href={n.href} className={`mobileNavItem ${active ? 'mobileNavActive' : ''}`}>
-              <Icon active={active} />
-              <span>{n.label}</span>
-            </Link>
-          )
-        })}
-      </nav>
-    </div>
+        <main className="main">{children}</main>
+
+        <nav className="mobileNav" aria-label="Navigation">
+          {NAV.map(n => {
+            const active = n.href === '/dashboard' ? pathname === n.href : pathname.startsWith(n.href)
+            const Icon = n.icon
+            return (
+              <Link key={n.href} href={n.href} className={`mobileNavItem ${active ? 'mobileNavActive' : ''}`}>
+                <Icon active={active} />
+                <span>{n.label}</span>
+              </Link>
+            )
+          })}
+        </nav>
+      </div>
+    </BoxProvider>
   )
 }
