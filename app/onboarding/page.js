@@ -34,7 +34,7 @@ export default function OnboardingPage() {
     if (looksLikeInviteCode(boxName)) {
       const confirmed = confirm(
         `"${boxName}" ressemble à un code d'invitation plutôt qu'à un nom de box.\n\n` +
-        `Si tu as reçu un code de ton coach, clique sur "Annuler" puis va sur l'onglet "J'ai un code".\n\n` +
+        `Si tu as reçu un code de ton coach, clique sur "Annuler" puis va sur l'onglet "J’ai un code".\n\n` +
         `Si c'est bien le nom que tu veux donner à ta box, clique sur "OK".`
       )
       if (!confirmed) return
@@ -77,7 +77,7 @@ export default function OnboardingPage() {
 
         <div className="segmented" style={{ marginBottom: 18 }}>
           <button type="button" className={`segmentedBtn ${tab === 'create' ? 'segmentedBtnActive' : ''}`} onClick={() => setTab('create')}>Je suis coach</button>
-          <button type="button" className={`segmentedBtn ${tab === 'join' ? 'segmentedBtnActive' : ''}`} onClick={() => setTab('join')}>J'ai un code</button>
+          <button type="button" className={`segmentedBtn ${tab === 'join' ? 'segmentedBtnActive' : ''}`} onClick={() => setTab('join')}>J’ai un code</button>
         </div>
 
         {tab === 'create' ? (
@@ -87,7 +87,7 @@ export default function OnboardingPage() {
               <input value={boxName} onChange={e => setBoxName(e.target.value)} placeholder="Ben&Fit Nantes" maxLength={60} required />
               {suspiciousBoxName && (
                 <p className="muted" style={{ fontSize: 13, marginTop: 6, color: 'var(--accent, #ff6b35)' }}>
-                  Ça ressemble à un code d'invitation. Si ton coach t'en a donné un, va plutôt sur l'onglet « J'ai un code » →
+                  Ça ressemble à un code d’invitation. Si ton coach t’en a donné un, va plutôt sur l’onglet « J’ai un code » →
                 </p>
               )}
             </div>
@@ -97,7 +97,7 @@ export default function OnboardingPage() {
         ) : (
           <form onSubmit={handleJoin} className="stack card">
             <div>
-              <label>Code d'invitation</label>
+              <label>Code d’invitation</label>
               <input value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="EX: BENFIT2026" maxLength={40} required />
             </div>
             {error && <div className="errorBox">{error}</div>}
