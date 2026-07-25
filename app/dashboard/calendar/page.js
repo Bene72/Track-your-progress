@@ -103,7 +103,7 @@ export default function CalendarPage() {
           <div style={{ textAlign: 'center', flex: 1 }}>
             <span style={{ fontWeight: 700, textTransform: 'capitalize' }}>{monthLabel}</span>
             {' '}
-            <button className="btn btnGhost btnSm" onClick={cal.goToday} style={{ marginLeft: 8 }}>Aujourd'hui</button>
+            <button className="btn btnGhost btnSm" onClick={cal.goToday} style={{ marginLeft: 8 }}>Aujourd’hui</button>
           </div>
           <button className="btn btnGhost btnSm" onClick={() => cal.goToMonth(1)}>→</button>
         </div>
