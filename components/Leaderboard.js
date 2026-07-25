@@ -13,7 +13,7 @@ function rankValue(score, wod) {
 
 export default function Leaderboard({ wod, scores, currentUserId }) {
   if (!scores || scores.length === 0) {
-    return <p className="muted" style={{ padding: '12px 0' }}>Personne n'a encore posté de score.</p>
+    return <p className="muted" style={{ padding: '12px 0' }}>Personne n’a encore posté de score.</p>
   }
   const sorted = [...scores].sort((a, b) => rankValue(a, wod) - rankValue(b, wod))
   return (
