@@ -78,6 +78,17 @@ export default function PrPage() {
   const box = useBox()
   const pr = usePrData(userId)
   const [showForm, setShowForm] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
+
+  const handleDelete = async (id, movement) => {
+    if (!confirm(`Supprimer le PR "${movement}" ? Cette action est irréversible.`)) return
+    setDeleteError(null)
+    try {
+      await pr.deleteRecord(id)
+    } catch (err) {
+      setDeleteError(err.message || 'Erreur lors de la suppression')
+    }
+  }
 
   if (pr.loading) return <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>
 
@@ -109,6 +120,7 @@ export default function PrPage() {
       {pr.records.length > 0 && (
         <div className="card">
           <h3 className="eyebrow" style={{ marginBottom: 8 }}>Historique</h3>
+          {deleteError && <div className="errorBox" style={{ marginBottom: 8 }}>{deleteError}</div>}
           <div className="stack" style={{ gap: 8 }}>
             {pr.records.map(r => (
               <div key={r.id} className="row">
@@ -118,7 +130,7 @@ export default function PrPage() {
                 </div>
                 <div className="row" style={{ gap: 10, width: 'auto' }}>
                   <span className="mono" style={{ fontWeight: 700 }}>{formatPrValue(r)}</span>
-                  <button className="btn btnGhost btnSm" onClick={() => pr.deleteRecord(r.id)} aria-label="Supprimer">✕</button>
+                  <button className="btn btnGhost btnSm" onClick={() => handleDelete(r.id, r.movement)} aria-label="Supprimer">✕</button>
                 </div>
               </div>
             ))}
