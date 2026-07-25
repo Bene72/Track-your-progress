@@ -1,0 +1,19 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# secrets — NE JAMAIS committer de clés, même "publiques" côté Supabase
+.env
+.env*.local
+!.env.local.example
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+
+# vercel
+.vercel
