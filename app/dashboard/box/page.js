@@ -1,114 +1,99 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '../../../lib/supabase'
-import { useCurrentUser } from '../../../lib/hooks/useCurrentUser'
-import { useBox } from '../../../lib/hooks/useBox'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { supabase } from '../../lib/supabase'
+import { sanitizeText, passwordSchema, passwordStrength } from '../../lib/security'
 
-function randomCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  return Array.from({ length: 7 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+export default function AuthPage() {
+  return (
+    <Suspense fallback={null}>
+      <AuthPageInner />
+    </Suspense>
+  )
 }
 
-export default function BoxPage() {
+function AuthPageInner() {
   const router = useRouter()
-  const { userId } = useCurrentUser({ redirectIfNull: true })
-  const box = useBox()
-  const [members, setMembers] = useState([])
-  const [invites, setInvites] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [creatingInvite, setCreatingInvite] = useState(false)
+  const params = useSearchParams()
+  const [mode, setMode] = useState('login') // 'login' | 'signup'
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [info, setInfo] = useState(null)
 
-  const load = useCallback(async () => {
-    if (!box.activeBoxId) return
-    setLoading(true)
-    const [{ data: m }, { data: inv }] = await Promise.all([
-      supabase.from('box_members').select('*, profiles ( full_name )').eq('box_id', box.activeBoxId).eq('status', 'active'),
-      box.isCoach
-        ? supabase.from('box_invites').select('*').eq('box_id', box.activeBoxId).eq('active', true).order('created_at', { ascending: false })
-        : Promise.resolve({ data: [] }),
-    ])
-    setMembers(m || [])
-    setInvites(inv || [])
-    setLoading(false)
-  }, [box.activeBoxId, box.isCoach])
-
-  useEffect(() => { load() }, [load])
-
-  const handleCreateInvite = async () => {
-    setCreatingInvite(true)
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError(null); setInfo(null); setLoading(true)
     try {
-      const code = randomCode()
-      const { error } = await supabase.from('box_invites').insert({ box_id: box.activeBoxId, code, created_by: userId, role: 'member' })
-      if (error) throw error
-      await load()
-    } catch (e) {
-      alert(e.message)
-    } finally { setCreatingInvite(false) }
+      if (mode === 'signup') {
+        const pwCheck = passwordSchema.safeParse(password)
+        if (!pwCheck.success) {
+          setError(pwCheck.error.issues[0].message)
+          setLoading(false)
+          return
+        }
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { data: { full_name: sanitizeText(fullName, 80) } },
+        })
+        if (error) throw error
+        setInfo('Compte créé. Vérifie ta boîte mail pour confirmer, puis connecte-toi.')
+        setMode('login')
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+        if (error) throw error
+        router.push(params.get('next') || '/dashboard')
+      }
+    } catch (err) {
+      setError(err.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : err.message)
+    } finally {
+      setLoading(false)
+    }
   }
-
-  const handleLeave = async () => {
-    if (!confirm(`Quitter ${box.activeBoxName} ?`)) return
-    await supabase.from('box_members').delete().eq('box_id', box.activeBoxId).eq('user_id', userId)
-    router.push('/onboarding')
-  }
-
-  if (box.loading || loading) return <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>
 
   return (
-    <div className="stack">
-      <div>
-        <div className="eyebrow">Ma box</div>
-        <h1 className="h1">{box.activeBoxName}</h1>
-      </div>
-
-      {box.memberships.length > 1 && (
-        <div className="card">
-          <h3 className="eyebrow" style={{ marginBottom: 8 }}>Changer de box</h3>
-          <div className="stack" style={{ gap: 8 }}>
-            {box.memberships.map(m => (
-              <button key={m.box_id} className={`btn ${m.box_id === box.activeBoxId ? 'btnPrimary' : 'btnGhost'} btnBlock`} onClick={() => box.switchBox(m.box_id)}>
-                {m.boxes.name}
-              </button>
-            ))}
-          </div>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ width: '100%', maxWidth: 380 }}>
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div className="logo" style={{ fontSize: 34 }}>BOX<span>LOG</span></div>
+          <p className="muted">Le WOD du jour. Ton score. Tes PR.</p>
         </div>
-      )}
 
-      {box.isCoach && (
-        <div className="card">
-          <div className="row" style={{ marginBottom: 8 }}>
-            <h3 className="eyebrow">Codes d'invitation</h3>
-            <button className="btn btnPrimary btnSm" onClick={handleCreateInvite} disabled={creatingInvite}>+ Code</button>
-          </div>
-          {invites.length === 0 ? (
-            <p className="muted">Aucun code actif. Génère-en un pour tes adhérents.</p>
-          ) : (
-            <div className="stack" style={{ gap: 8 }}>
-              {invites.map(inv => (
-                <div key={inv.id} className="row">
-                  <span className="mono" style={{ fontWeight: 700, letterSpacing: 2 }}>{inv.code}</span>
-                  <button className="btn btnGhost btnSm" onClick={() => navigator.clipboard?.writeText(inv.code)}>Copier</button>
-                </div>
-              ))}
+        <div className="segmented" style={{ marginBottom: 20 }}>
+          <button type="button" className={`segmentedBtn ${mode === 'login' ? 'segmentedBtnActive' : ''}`} onClick={() => setMode('login')}>Connexion</button>
+          <button type="button" className={`segmentedBtn ${mode === 'signup' ? 'segmentedBtnActive' : ''}`} onClick={() => setMode('signup')}>Inscription</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="stack card">
+          {mode === 'signup' && (
+            <div>
+              <label>Nom complet</label>
+              <input value={fullName} onChange={e => setFullName(e.target.value)} required maxLength={80} placeholder="Jean Dupont" />
             </div>
           )}
-        </div>
-      )}
-
-      <div className="card">
-        <h3 className="eyebrow" style={{ marginBottom: 8 }}>Adhérents ({members.length})</h3>
-        <div className="stack" style={{ gap: 0 }}>
-          {members.map(m => (
-            <div key={m.id} className="leaderRow">
-              <span className="leaderName">{m.profiles?.full_name || '—'}{m.user_id === userId ? ' (toi)' : ''}</span>
-              {m.role === 'coach' && <span className="badge badgeAccent">Coach</span>}
-            </div>
-          ))}
-        </div>
+          <div>
+            <label>Email</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="toi@exemple.com" />
+          </div>
+          <div>
+            <label>Mot de passe</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} placeholder="••••••••" />
+            {mode === 'signup' && password.length > 0 && (
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                Force : {passwordStrength(password)} · min. 8 caractères, 1 lettre, 1 chiffre
+              </div>
+            )}
+          </div>
+          {error && <div className="errorBox">{error}</div>}
+          {info && <div className="badge badgeRx" style={{ display: 'block', padding: '10px 12px' }}>{info}</div>}
+          <button type="submit" className="btn btnPrimary btnBlock" disabled={loading}>
+            {loading ? '...' : mode === 'login' ? 'Se connecter' : "Créer mon compte"}
+          </button>
+        </form>
       </div>
-
-      <button className="btn btnGhost btnBlock" onClick={handleLeave}>Quitter cette box</button>
     </div>
   )
 }
