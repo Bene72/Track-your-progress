@@ -12,15 +12,16 @@ export default function DashboardHome() {
   const { userId, userName } = useCurrentUser({ redirectIfNull: true })
   const box = useBox()
   const wodData = useWodData(box.activeBoxId, userId)
+  const { todayWod, myTodayScore, getLeaderboard } = wodData
   const [editing, setEditing] = useState(false)
   const [scores, setScores] = useState([])
   const [toast, setToast] = useState(null)
 
   useEffect(() => {
-    if (wodData.todayWod) {
-      wodData.getLeaderboard(wodData.todayWod.id).then(setScores)
+    if (todayWod) {
+      getLeaderboard(todayWod.id).then(setScores)
     }
-  }, [wodData.todayWod, wodData.myTodayScore])
+  }, [todayWod, myTodayScore, getLeaderboard])
 
   if (box.loading || wodData.loading) {
     return <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>
@@ -42,7 +43,7 @@ export default function DashboardHome() {
 
       {!wodData.todayWod ? (
         <div className="card empty">
-          <p>Aucun WOD publié aujourd'hui.</p>
+          <p>Aucun WOD publié aujourd’hui.</p>
           <Link href="/dashboard/wod/new" className="btn btnPrimary" style={{ marginTop: 14 }}>Proposer le WOD du jour</Link>
         </div>
       ) : (
