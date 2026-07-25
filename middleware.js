@@ -16,6 +16,9 @@ function buildSecurityHeaders(nonce) {
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Resource-Policy': 'same-origin',
+    'X-Permitted-Cross-Domain-Policies': 'none',
     'Content-Security-Policy': [
       "default-src 'self'",
       isDev
