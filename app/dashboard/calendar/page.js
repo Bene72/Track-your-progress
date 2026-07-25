@@ -5,11 +5,7 @@ import { useCurrentUser } from '../../../lib/hooks/useCurrentUser'
 import { useBox } from '../../../lib/hooks/useBox'
 import { useCalendarData } from '../../../lib/hooks/useCalendarData'
 import { WOD_FORMAT_LABELS } from '../../../lib/constants'
-
-function toLocalKey(d) {
-  const offset = d.getTimezoneOffset() * 60000
-  return new Date(d.getTime() - offset).toISOString().slice(0, 10)
-}
+import { localDateKey as toLocalKey } from '../../../lib/date'
 
 function formatRecordValue(rec) {
   if (rec.value_type === 'time') {
