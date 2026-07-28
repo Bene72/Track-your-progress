@@ -5,7 +5,6 @@ import { supabase } from '../../../../lib/supabase'
 import { useCurrentUser } from '../../../../lib/hooks/useCurrentUser'
 import { useBox } from '../../../../lib/hooks/useBox'
 import WodCard from '../../../../components/WodCard'
-import WodEditForm from '../../../../components/WodEditForm'
 import ScoreForm from '../../../../components/ScoreForm'
 import Leaderboard from '../../../../components/Leaderboard'
 
@@ -18,7 +17,6 @@ export default function WodDetailPage() {
   const [scores, setScores] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
-  const [editingWod, setEditingWod] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
 
@@ -39,19 +37,8 @@ export default function WodDetailPage() {
   if (!wod) return <div className="card empty">WOD introuvable.</div>
 
   const myScore = scores.find(s => s.user_id === userId) || null
-  // Seul l'auteur du WOD ou le coach de la box peut le modifier ou le supprimer.
-  const canEdit = wod.created_by === userId || box.isCoach
-  const canDelete = canEdit
-
-  const handleUpdateWod = async (payload) => {
-    // Update ciblé sur la ligne du WOD uniquement (table `wods`). La table
-    // `wod_scores` référence ce WOD par wod_id, qui ne change pas : les
-    // scores et notes déjà postés par les adhérents restent intacts.
-    const { error } = await supabase.from('wods').update(payload).eq('id', wod.id)
-    if (error) throw error
-    setEditingWod(false)
-    await load()
-  }
+  // Seul l'auteur du WOD ou le coach de la box peut le supprimer.
+  const canDelete = wod.created_by === userId || box.isCoach
 
   const handleSubmit = async (payload) => {
     const { error } = await supabase.from('wod_scores')
@@ -77,31 +64,21 @@ export default function WodDetailPage() {
 
   return (
     <div className="stack">
-      {editingWod ? (
-        <div className="card">
-          <h3 className="h2" style={{ fontSize: 18, marginBottom: 12 }}>Modifier le WOD</h3>
-          <WodEditForm wod={wod} onSubmit={handleUpdateWod} onCancel={() => setEditingWod(false)} />
-        </div>
-      ) : (
-        <WodCard wod={wod} />
-      )}
+      <WodCard wod={wod} />
 
-      {canEdit && !editingWod && (
-        <div className="row" style={{ gap: 8 }}>
-          <button className="btn btnGhost" style={{ flex: 1 }} onClick={() => setEditingWod(true)}>
-            Modifier ce WOD
-          </button>
+      {canDelete && (
+        <>
           <button
-            className="btn btnGhost"
-            style={{ flex: 1, color: 'var(--rx, #e5484d)', borderColor: 'rgba(229,72,77,0.4)' }}
+            className="btn btnGhost btnBlock"
+            style={{ color: 'var(--rx, #e5484d)', borderColor: 'rgba(229,72,77,0.4)' }}
             onClick={handleDelete}
             disabled={deleting}
           >
             {deleting ? 'Suppression...' : 'Supprimer ce WOD'}
           </button>
-        </div>
+          {deleteError && <div className="errorBox">{deleteError}</div>}
+        </>
       )}
-      {deleteError && <div className="errorBox">{deleteError}</div>}
 
       {myScore && !editing ? (
         <div className="card">
