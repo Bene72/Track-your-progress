@@ -2,19 +2,7 @@
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
-import { sanitizeText, passwordSchema, passwordStrength } from '../../lib/security'
-
-// Défense contre l'open redirect : `next` vient de l'URL (donc du
-// visiteur). Un lien piégé du type /auth?next=https://evil.com ou
-// /auth?next=//evil.com pourrait rediriger un utilisateur qui vient de
-// se connecter vers un site tiers. On n'accepte qu'un chemin interne
-// commençant par un seul "/" (jamais "//", qui est interprété comme une
-// URL protocole-relative par le navigateur).
-function safeNextPath(next) {
-  if (typeof next !== 'string') return '/dashboard'
-  if (!next.startsWith('/') || next.startsWith('//')) return '/dashboard'
-  return next
-}
+import { sanitizeText, passwordSchema } from '../../lib/security'
 
 export default function AuthPage() {
   return (
@@ -42,7 +30,7 @@ function AuthPageInner() {
       if (mode === 'signup') {
         const pwCheck = passwordSchema.safeParse(password)
         if (!pwCheck.success) {
-          setError(pwCheck.error.issues[0]?.message || 'Mot de passe trop faible.')
+          setError(pwCheck.error.issues[0].message)
           setLoading(false)
           return
         }
@@ -57,7 +45,7 @@ function AuthPageInner() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
         if (error) throw error
-        router.push(safeNextPath(params.get('next')))
+        router.push(params.get('next') || '/dashboard')
       }
     } catch (err) {
       setError(err.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : err.message)
@@ -92,12 +80,7 @@ function AuthPageInner() {
           </div>
           <div>
             <label>Mot de passe</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={8} placeholder="••••••••" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />
-            {mode === 'signup' && password.length > 0 && (
-              <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                Force : {passwordStrength(password)} · au moins 8 caractères, une lettre et un chiffre
-              </p>
-            )}
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} placeholder="••••••••" />
           </div>
           {error && <div className="errorBox">{error}</div>}
           {info && <div className="badge badgeRx" style={{ display: 'block', padding: '10px 12px' }}>{info}</div>}
