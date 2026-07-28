@@ -1,5 +1,5 @@
 'use client'
-import { Suspense, useState } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import { sanitizeText, passwordSchema } from '../../lib/security'
@@ -23,6 +23,12 @@ function AuthPageInner() {
   const [error, setError] = useState(null)
   const [info, setInfo] = useState(null)
 
+  useEffect(() => {
+    if (params.get('error') === 'confirmation_failed') {
+      setError("Le lien de confirmation est invalide ou a expiré. Recommence une inscription ou reconnecte-toi.")
+    }
+  }, [params])
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null); setInfo(null); setLoading(true)
@@ -37,7 +43,10 @@ function AuthPageInner() {
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { full_name: sanitizeText(fullName, 80) } },
+          options: {
+            data: { full_name: sanitizeText(fullName, 80) },
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
         })
         if (error) throw error
         setInfo('Compte créé. Vérifie ta boîte mail pour confirmer, puis connecte-toi.')
