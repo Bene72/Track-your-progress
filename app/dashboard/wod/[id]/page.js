@@ -26,7 +26,7 @@ export default function WodDetailPage() {
     setLoading(true)
     const [{ data: wodRow }, { data: scoreRows }] = await Promise.all([
       supabase.from('wods').select('*').eq('id', id).single(),
-      supabase.from('wod_scores').select('*, profiles ( full_name )').eq('wod_id', id),
+      supabase.from('wod_scores').select('*, profiles!left ( full_name )').eq('wod_id', id),
     ])
     setWod(wodRow || null)
     setScores(scoreRows || [])
