@@ -98,7 +98,7 @@ export default function WodCreateForm({ isCoach, onSubmit, onCancel }) {
 
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, textTransform: 'none', cursor: 'pointer' }}>
         <input type="checkbox" style={{ width: 'auto' }} checked={isBenchmark} onChange={e => setIsBenchmark(e.target.checked)} />
-        <span style={{ fontSize: 14, color: 'var(--chalk)' }}>C'est un WOD benchmark (ex: Fran, Murph)</span>
+        <span style={{ fontSize: 14, color: 'var(--chalk)' }}>C&apos;est un WOD benchmark (ex: Fran, Murph)</span>
       </label>
 
       {!isCoach && <p className="muted" style={{ fontSize: 13 }}>Ta proposition sera visible par le coach pour validation.</p>}
