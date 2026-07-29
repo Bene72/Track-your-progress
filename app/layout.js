@@ -1,5 +1,11 @@
 import './globals.css'
 import { headers } from 'next/headers'
+import { Inter, Bebas_Neue, Space_Mono } from 'next/font/google'
+
+const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'], variable: '--font-body', display: 'swap' })
+const bebasNeue = Bebas_Neue({ subsets: ['latin'], weight: '400', variable: '--font-display', display: 'swap' })
+const spaceMono = Space_Mono({ subsets: ['latin'], weight: ['400', '700'], variable: '--font-mono', display: 'swap' })
+
 export const metadata = {
   title: 'BoxLog — WOD & Performance',
   description: 'Note le WOD du jour, ton score, et suis tes PR.',
@@ -20,7 +26,7 @@ export default function RootLayout({ children }) {
   // et l'app reste sur un écran blanc/noir en production.
   headers()
   return (
-    <html lang="fr">
+    <html lang="fr" className={`${inter.variable} ${bebasNeue.variable} ${spaceMono.variable}`}>
       <body>{children}</body>
     </html>
   )
