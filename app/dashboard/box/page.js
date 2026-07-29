@@ -63,12 +63,23 @@ export default function BoxPage() {
   const load = useCallback(async () => {
     if (!box.activeBoxId) return
     setLoading(true)
-    const [{ data: m }, { data: inv }] = await Promise.all([
-      supabase.from('box_members').select('*, profiles!box_members_user_id_fkey!left ( full_name )').eq('box_id', box.activeBoxId).eq('status', 'active'),
+    const [{ data: rawMembers }, { data: inv }] = await Promise.all([
+      supabase.from('box_members').select('*').eq('box_id', box.activeBoxId).eq('status', 'active'),
       box.isCoach
         ? supabase.from('box_invites').select('*').eq('box_id', box.activeBoxId).eq('active', true).order('created_at', { ascending: false })
         : Promise.resolve({ data: [] }),
     ])
+
+    // Pas de FK déclarée entre box_members et profiles : on ne peut pas
+    // demander à PostgREST de faire la jointure automatiquement (embedding).
+    // On récupère les profils correspondants séparément et on fusionne ici.
+    let m = rawMembers || []
+    const userIds = [...new Set(m.map(row => row.user_id).filter(Boolean))]
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', userIds)
+      const byId = Object.fromEntries((profiles || []).map(p => [p.id, p]))
+      m = m.map(row => ({ ...row, profiles: byId[row.user_id] || null }))
+    }
     setMembers(m || [])
     setInvites(inv || [])
     setLoading(false)
