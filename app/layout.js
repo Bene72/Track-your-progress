@@ -1,11 +1,16 @@
 import './globals.css'
 import { headers } from 'next/headers'
-
 export const metadata = {
   title: 'BoxLog — WOD & Performance',
   description: 'Note le WOD du jour, ton score, et suis tes PR.',
 }
-
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover', // gère les safe-areas (encoche/home indicator) en plein écran
+  themeColor: '#121316',
+}
 export default function RootLayout({ children }) {
   // Lire headers() force Next.js à rendre chaque page dynamiquement
   // (par requête) au lieu de la pré-générer une seule fois au build.
