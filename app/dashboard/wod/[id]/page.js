@@ -41,7 +41,6 @@ export default function WodDetailPage() {
   const myScore = scores.find(s => s.user_id === userId) || null
   // Seul l'auteur du WOD ou le coach de la box peut le modifier ou le supprimer.
   const canEdit = wod.created_by === userId || box.isCoach
-  const canDelete = canEdit
 
   const handleUpdateWod = async (payload) => {
     // Update ciblé sur la ligne du WOD uniquement (table `wods`). La table
