@@ -5,6 +5,7 @@ import { useCurrentUser } from '../../lib/hooks/useCurrentUser'
 import { useBox } from '../../lib/hooks/useBox'
 import { useWodData } from '../../lib/hooks/useWodData'
 import WodCard from '../../components/WodCard'
+import WodCreateForm from '../../components/WodCreateForm'
 import ScoreForm from '../../components/ScoreForm'
 import Leaderboard from '../../components/Leaderboard'
 
@@ -14,6 +15,7 @@ export default function DashboardHome() {
   const wodData = useWodData(box.activeBoxId, userId)
   const { todayWod, myTodayScore, getLeaderboard } = wodData
   const [editing, setEditing] = useState(false)
+  const [creatingWod, setCreatingWod] = useState(false)
   const [scores, setScores] = useState([])
   const [toast, setToast] = useState(null)
 
@@ -34,6 +36,13 @@ export default function DashboardHome() {
     setTimeout(() => setToast(null), 2500)
   }
 
+  const handleCreateWod = async (payload) => {
+    await wodData.createWod(payload)
+    setCreatingWod(false)
+    setToast(payload.status === 'published' ? 'WOD publié 💪' : 'Proposition envoyée')
+    setTimeout(() => setToast(null), 2500)
+  }
+
   return (
     <div className="stack">
       <div>
@@ -41,11 +50,21 @@ export default function DashboardHome() {
         <h1 className="h1">Salut {userName.split(' ')[0]}</h1>
       </div>
 
-      {!wodData.todayWod ? (
-        <div className="card empty">
-          <p>Aucun WOD publié aujourd’hui.</p>
-          <Link href="/dashboard/wod/new" className="btn btnPrimary" style={{ marginTop: 14 }}>Proposer le WOD du jour</Link>
+      {creatingWod ? (
+        <div className="card">
+          <h3 className="h2" style={{ fontSize: 18, marginBottom: 12 }}>Ajouter un WOD</h3>
+          <WodCreateForm isCoach={box.isCoach} onSubmit={handleCreateWod} onCancel={() => setCreatingWod(false)} />
         </div>
+      ) : (
+        <button className="btn btnGhost btnBlock" onClick={() => setCreatingWod(true)}>+ Ajouter un WOD</button>
+      )}
+
+      {!wodData.todayWod ? (
+        !creatingWod && (
+          <div className="card empty">
+            <p>Aucun WOD publié aujourd’hui.</p>
+          </div>
+        )
       ) : (
         <>
           <WodCard wod={wodData.todayWod} />
