@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
-
 *, *::before, *::after {
   box-sizing: border-box; margin: 0; padding: 0;
   /* Supprime le halo tactile par défaut d'Android/Chrome sur les liens et
@@ -37,9 +35,35 @@
 
   --radius: 14px;
   --radius-sm: 9px;
+  --radius-lg: 20px;
   --nav-h: 60px;
   --mnav-h: 68px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* ── Alias sémantiques additifs (n'importe où en dur pointera encore
+     vers les couleurs existantes ci-dessus — rien de cassé ; à utiliser
+     dans le nouveau code au lieu d'ajouter d'autres #hex/px isolés) ── */
+  --success:     var(--rx);
+  --success-dim: var(--rx-dim);
+  --warning:     var(--gold);
+  --warning-dim: var(--gold-dim);
+  --info:        #4A9EFF;
+  --info-dim:    rgba(74, 158, 255, 0.14);
+
+  --surface-1: var(--bg-card);
+  --surface-2: var(--bg-card-2);
+  --surface-3: #2B2E35;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  --transition-fast:   .1s ease;
+  --transition-normal: .15s ease;
+  --transition-slow:   .25s ease;
 }
 
 html, body { height: 100%; overflow-x: hidden; }
