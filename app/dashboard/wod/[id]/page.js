@@ -24,12 +24,28 @@ export default function WodDetailPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data: wodRow }, { data: scoreRows }] = await Promise.all([
+    const [{ data: wodRow, error: wodError }, { data: scoreRows, error: scoreError }] = await Promise.all([
       supabase.from('wods').select('*').eq('id', id).single(),
-      supabase.from('wod_scores').select('*, profiles!left ( full_name )').eq('wod_id', id),
+      supabase.from('wod_scores').select('*').eq('wod_id', id),
     ])
+    if (wodError) console.error('Erreur chargement WOD:', wodError.message)
+    if (scoreError) console.error('Erreur chargement scores:', scoreError.message)
+
+    // Pas de FK fiable garantie entre wod_scores et profiles : on récupère
+    // les profils correspondants séparément et on fusionne ici plutôt que
+    // de compter sur l'embedding PostgREST (qui échoue silencieusement en
+    // 400 si la relation n'est pas déclarée en base).
+    let s = scoreRows || []
+    const userIds = [...new Set(s.map(row => row.user_id).filter(Boolean))]
+    if (userIds.length > 0) {
+      const { data: profiles, error: profError } = await supabase.from('profiles').select('id, full_name').in('id', userIds)
+      if (profError) console.error('Erreur chargement profils:', profError.message)
+      const byId = Object.fromEntries((profiles || []).map(p => [p.id, p]))
+      s = s.map(row => ({ ...row, profiles: byId[row.user_id] || null }))
+    }
+
     setWod(wodRow || null)
-    setScores(scoreRows || [])
+    setScores(s)
     setLoading(false)
   }, [id])
 
