@@ -64,7 +64,7 @@ export default function BoxPage() {
     if (!box.activeBoxId) return
     setLoading(true)
     const [{ data: m }, { data: inv }] = await Promise.all([
-      supabase.from('box_members').select('*, profiles ( full_name )').eq('box_id', box.activeBoxId).eq('status', 'active'),
+      supabase.from('box_members').select('*, profiles!box_members_user_id_fkey!left ( full_name )').eq('box_id', box.activeBoxId).eq('status', 'active'),
       box.isCoach
         ? supabase.from('box_invites').select('*').eq('box_id', box.activeBoxId).eq('active', true).order('created_at', { ascending: false })
         : Promise.resolve({ data: [] }),
