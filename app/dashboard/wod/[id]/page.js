@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '../../../../lib/supabase'
+import { WOD_COLUMNS, WOD_SCORE_COLUMNS } from '../../../../lib/db-columns'
 import { useCurrentUser } from '../../../../lib/hooks/useCurrentUser'
 import { useBox } from '../../../../lib/hooks/useBox'
 import WodCard from '../../../../components/WodCard'
@@ -25,8 +26,8 @@ export default function WodDetailPage() {
   const load = useCallback(async () => {
     setLoading(true)
     const [{ data: wodRow, error: wodError }, { data: scoreRows, error: scoreError }] = await Promise.all([
-      supabase.from('wods').select('*').eq('id', id).single(),
-      supabase.from('wod_scores').select('*').eq('wod_id', id),
+      supabase.from('wods').select(WOD_COLUMNS).eq('id', id).single(),
+      supabase.from('wod_scores').select(WOD_SCORE_COLUMNS).eq('wod_id', id),
     ])
     if (wodError) console.error('Erreur chargement WOD:', wodError.message)
     if (scoreError) console.error('Erreur chargement scores:', scoreError.message)
