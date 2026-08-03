@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useCurrentUser } from '../../../lib/hooks/useCurrentUser'
 import { useBox } from '../../../lib/hooks/useBox'
+import { BOX_MEMBER_COLUMNS, PROFILE_COLUMNS_MINIMAL } from '../../../lib/db-columns'
 
 const PERIODS = [
   { label: '7 jours', days: 7 },
@@ -45,7 +46,7 @@ export default function CoachDashboardPage() {
       const since = daysAgoISO(periodDays)
 
       const [{ data: rawMembers, error: mErr }, { data: wodRows, error: wErr }] = await Promise.all([
-        supabase.from('box_members').select('*').eq('box_id', box.activeBoxId).eq('status', 'active'),
+        supabase.from('box_members').select(BOX_MEMBER_COLUMNS).eq('box_id', box.activeBoxId).eq('status', 'active'),
         supabase.from('wods').select('id, title, wod_date, format')
           .eq('box_id', box.activeBoxId).eq('status', 'published')
           .gte('wod_date', since.slice(0, 10))
@@ -69,7 +70,7 @@ export default function CoachDashboardPage() {
       let m = rawMembers || []
       const userIds = [...new Set(m.map(row => row.user_id).filter(Boolean))]
       if (userIds.length > 0) {
-        const { data: profiles, error: pErr } = await supabase.from('profiles').select('id, full_name').in('id', userIds)
+        const { data: profiles, error: pErr } = await supabase.from('profiles').select(PROFILE_COLUMNS_MINIMAL).in('id', userIds)
         if (pErr) throw pErr
         const byId = Object.fromEntries((profiles || []).map(p => [p.id, p]))
         m = m.map(row => ({ ...row, profiles: byId[row.user_id] || null }))
