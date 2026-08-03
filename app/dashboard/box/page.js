@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { useCurrentUser } from '../../../lib/hooks/useCurrentUser'
 import { useBox } from '../../../lib/hooks/useBox'
+import { BOX_MEMBER_COLUMNS, BOX_INVITE_COLUMNS, PROFILE_COLUMNS_MINIMAL } from '../../../lib/db-columns'
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const CODE_LENGTH = 7
@@ -64,9 +65,9 @@ export default function BoxPage() {
     if (!box.activeBoxId) return
     setLoading(true)
     const [{ data: rawMembers }, { data: inv }] = await Promise.all([
-      supabase.from('box_members').select('*').eq('box_id', box.activeBoxId).eq('status', 'active'),
+      supabase.from('box_members').select(BOX_MEMBER_COLUMNS).eq('box_id', box.activeBoxId).eq('status', 'active'),
       box.isCoach
-        ? supabase.from('box_invites').select('*').eq('box_id', box.activeBoxId).eq('active', true).order('created_at', { ascending: false })
+        ? supabase.from('box_invites').select(BOX_INVITE_COLUMNS).eq('box_id', box.activeBoxId).eq('active', true).order('created_at', { ascending: false })
         : Promise.resolve({ data: [] }),
     ])
 
@@ -76,7 +77,7 @@ export default function BoxPage() {
     let m = rawMembers || []
     const userIds = [...new Set(m.map(row => row.user_id).filter(Boolean))]
     if (userIds.length > 0) {
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', userIds)
+      const { data: profiles } = await supabase.from('profiles').select(PROFILE_COLUMNS_MINIMAL).in('id', userIds)
       const byId = Object.fromEntries((profiles || []).map(p => [p.id, p]))
       m = m.map(row => ({ ...row, profiles: byId[row.user_id] || null }))
     }
