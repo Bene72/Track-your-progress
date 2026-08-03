@@ -54,7 +54,13 @@ function AuthPageInner() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
         if (error) throw error
-        router.push(params.get('next') || '/dashboard')
+        const nextParam = params.get('next')
+        // Même garde-fou que app/auth/callback/route.js : uniquement un
+        // chemin relatif interne, jamais une valeur externe non validée.
+        const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')
+          ? nextParam
+          : '/dashboard'
+        router.push(next)
       }
     } catch (err) {
       setError(err.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect.' : err.message)
