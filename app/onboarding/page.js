@@ -62,7 +62,10 @@ export default function OnboardingPage() {
       if (error) throw error
       router.push('/dashboard')
     } catch (err) {
-      setError('Code invalide ou expiré.')
+      // Le RPC renvoie soit "Code invalide ou expiré", soit un message de
+      // limitation ("Trop de tentatives...") — les deux sont sûrs à
+      // afficher tels quels (pas de détail interne).
+      setError(err.message || 'Code invalide ou expiré.')
     } finally { setLoading(false) }
   }
 
