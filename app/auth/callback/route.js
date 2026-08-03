@@ -11,7 +11,16 @@ import { createServerSupabase } from '../../../lib/supabase-server'
 export async function GET(request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') || '/dashboard'
+  const nextParam = searchParams.get('next')
+  // On n'accepte qu'un chemin relatif interne ("/dashboard", "/onboarding"...).
+  // Toute valeur commençant par "//" (URL protocol-relative) ou contenant
+  // un schéma ("http:", "javascript:"...) est rejetée au profit du
+  // fallback par défaut — défense en profondeur contre un open redirect,
+  // même si la simple concaténation avec `origin` ci-dessous n'en permet
+  // pas d'exploitable aujourd'hui.
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')
+    ? nextParam
+    : '/dashboard'
 
   if (code) {
     const supabase = createServerSupabase()
