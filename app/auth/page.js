@@ -89,7 +89,19 @@ function AuthPageInner() {
           </div>
           <div>
             <label>Mot de passe</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} placeholder="••••••••" />
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              // minLength ne doit durcir que l'INSCRIPTION : un compte existant
+              // peut avoir un mot de passe créé avant le relèvement du minimum
+              // (6 → 8, cf. lib/security.js). Appliquer 8 aussi en connexion
+              // bloquerait ces utilisateurs via la validation HTML native
+              // avant même l'envoi de la requête.
+              minLength={mode === 'signup' ? 8 : 1}
+              placeholder="••••••••"
+            />
           </div>
           {error && <div className="errorBox">{error}</div>}
           {info && <div className="badge badgeRx" style={{ display: 'block', padding: '10px 12px' }}>{info}</div>}
