@@ -3,13 +3,7 @@ import { NextResponse } from 'next/server'
 
 const isDev = process.env.NODE_ENV === 'development'
 
-// style-src garde 'unsafe-inline' volontairement : l'app utilise beaucoup
-// de style={{...}} en JSX (attribut style="" sur le DOM), et un nonce CSP
-// ne peut PAS couvrir les attributs style — seulement les balises <style>
-// et <script>. Le retirer casserait tout le rendu. script-src, en
-// revanche, passe en nonce + strict-dynamic : c'est le vecteur XSS qui
-// compte vraiment (injection de <script> malveillant).
-function buildSecurityHeaders(nonce) {
+function securityHeaders(nonce) {
   return {
     'X-Frame-Options': 'DENY',
     'X-Content-Type-Options': 'nosniff',
@@ -21,9 +15,7 @@ function buildSecurityHeaders(nonce) {
     'X-Permitted-Cross-Domain-Policies': 'none',
     'Content-Security-Policy': [
       "default-src 'self'",
-      isDev
-        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-        : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+      isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https://*.supabase.co",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
@@ -35,62 +27,57 @@ function buildSecurityHeaders(nonce) {
   }
 }
 
-const PUBLIC_PATHS = ['/auth']
-const STATIC_REGEX = /\.(svg|png|jpg|jpeg|gif|webp|ico|woff2?)$/
+function applyHeaders(response, headers) {
+  for (const [name, value] of Object.entries(headers)) response.headers.set(name, value)
+  return response
+}
+
+function isPublicPath(pathname) {
+  return pathname === '/auth' || pathname.startsWith('/auth/')
+}
 
 export async function middleware(request) {
-  const { pathname } = request.nextUrl
-  if (STATIC_REGEX.test(pathname)) return NextResponse.next()
-
-  // Nonce unique par requête. Next.js le détecte automatiquement dans le
-  // header CSP de la requête entrante et l'applique lui-même à ses
-  // propres scripts inline (hydratation) — aucun changement requis dans
-  // app/layout.js tant qu'on n'ajoute pas de <script> custom.
-  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
-  const SECURITY_HEADERS = buildSecurityHeaders(nonce)
-
+  const nonce = btoa(crypto.randomUUID())
+  const headers = securityHeaders(nonce)
   const requestHeaders = new Headers(request.headers)
-  requestHeaders.set('Content-Security-Policy', SECURITY_HEADERS['Content-Security-Policy'])
+  requestHeaders.set('Content-Security-Policy', headers['Content-Security-Policy'])
 
-  let response = NextResponse.next({ request: { headers: requestHeaders } })
-  Object.entries(SECURITY_HEADERS).forEach(([k, v]) => response.headers.set(k, v))
-
+  let response = applyHeaders(NextResponse.next({ request: { headers: requestHeaders } }), headers)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
-        get(name) { return request.cookies.get(name)?.value },
-        set(name, value, options) {
+        get: (name) => request.cookies.get(name)?.value,
+        set: (name, value, options) => {
           request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({ request: { headers: requestHeaders } })
-          Object.entries(SECURITY_HEADERS).forEach(([k, v]) => response.headers.set(k, v))
+          response = applyHeaders(NextResponse.next({ request: { headers: requestHeaders } }), headers)
           response.cookies.set({ name, value, ...options })
         },
-        remove(name, options) {
+        remove: (name, options) => {
           request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({ request: { headers: requestHeaders } })
-          Object.entries(SECURITY_HEADERS).forEach(([k, v]) => response.headers.set(k, v))
+          response = applyHeaders(NextResponse.next({ request: { headers: requestHeaders } }), headers)
           response.cookies.set({ name, value: '', ...options })
         },
       },
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
-  const isPublic = PUBLIC_PATHS.some(p => pathname.startsWith(p))
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error) console.warn('Impossible de vérifier la session:', error.message)
 
-  if (!user && !isPublic) {
+  const { pathname, search } = request.nextUrl
+  if (!user && !isPublicPath(pathname)) {
     const redirectUrl = new URL('/auth', request.url)
-    redirectUrl.searchParams.set('next', pathname)
-    return NextResponse.redirect(redirectUrl)
+    redirectUrl.searchParams.set('next', `${pathname}${search}`)
+    return applyHeaders(NextResponse.redirect(redirectUrl), headers)
   }
   if (user && pathname === '/auth') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return applyHeaders(NextResponse.redirect(new URL('/dashboard', request.url)), headers)
   }
   return response
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)'],
 }
