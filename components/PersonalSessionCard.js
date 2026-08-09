@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, REST_OPTIONS } from '../lib/constants'
 
 // Une carte = une séance (une date peut en avoir plusieurs, comme plusieurs WOD).
@@ -18,7 +18,13 @@ export default function PersonalSessionCard({
   const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS[0].value)
   const [error, setError] = useState(null)
 
-  const timeLabel = new Date(session.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  // Calculé côté client uniquement : le serveur (Vercel, en UTC) et le
+  // navigateur (en heure française) donneraient une heure différente si on
+  // le calculait pendant le rendu, ce qui casse l'hydratation React.
+  const [timeLabel, setTimeLabel] = useState('')
+  useEffect(() => {
+    setTimeLabel(new Date(session.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
+  }, [session.created_at])
 
   const handleAddExercise = async () => {
     if (!selectedExerciseId) return
@@ -46,7 +52,7 @@ export default function PersonalSessionCard({
 
   return (
     <div className="card stack">
-      <span className="eyebrow">Séance de {timeLabel}</span>
+      <span className="eyebrow">Séance{timeLabel ? ` de ${timeLabel}` : ''}</span>
 
       <div>
         <label>Exercice</label>
