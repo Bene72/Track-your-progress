@@ -6,6 +6,7 @@ import { BoxProvider, useBoxContext } from '../../lib/context/BoxContext'
 
 const NAV = [
   { href: '/dashboard', label: 'Aujourd\'hui', icon: HomeIcon },
+  { href: '/dashboard/perso', label: 'Perso', icon: DumbbellIcon },
   { href: '/dashboard/calendar', label: 'Calendrier', icon: CalendarIcon },
   { href: '/dashboard/pr', label: 'Mes PR', icon: TrophyIcon },
   { href: '/dashboard/box', label: 'Ma box', icon: UsersIcon },
@@ -13,6 +14,9 @@ const NAV = [
 
 function HomeIcon({ active }) {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.8}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+}
+function DumbbellIcon({ active }) {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.8}><path d="M6.5 6.5l11 11"/><path d="M21 21l-1.5-1.5"/><path d="M3 3l1.5 1.5"/><path d="M18 6l3 3-1.5 1.5-3-3z"/><path d="M6 18l-3-3 1.5-1.5 3 3z"/><path d="M9 6l1.5-1.5L14 8l-1.5 1.5z"/><path d="M8 14l1.5 1.5L6 19l-1.5-1.5z"/></svg>
 }
 function CalendarIcon({ active }) {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.8}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
