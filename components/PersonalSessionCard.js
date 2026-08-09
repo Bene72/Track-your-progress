@@ -1,10 +1,11 @@
 'use client'
 import { useState } from 'react'
-import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS } from '../lib/constants'
+import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, REST_OPTIONS } from '../lib/constants'
 
-export default function PersonalSessionForm({
+// Une carte = une séance (une date peut en avoir plusieurs, comme plusieurs WOD).
+export default function PersonalSessionCard({
+  session,
   catalogByMuscle,
-  sessionExercises,
   onAddExercise,
   onAddCustomExercise,
   onAddSet,
@@ -16,6 +17,8 @@ export default function PersonalSessionForm({
   const [customName, setCustomName] = useState('')
   const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS[0].value)
   const [error, setError] = useState(null)
+
+  const timeLabel = new Date(session.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
   const handleAddExercise = async () => {
     if (!selectedExerciseId) return
@@ -42,8 +45,10 @@ export default function PersonalSessionForm({
   }
 
   return (
-    <div className="stack">
-      <div className="card">
+    <div className="card stack">
+      <span className="eyebrow">Séance de {timeLabel}</span>
+
+      <div>
         <label>Exercice</label>
         <select value={selectedExerciseId} onChange={e => setSelectedExerciseId(e.target.value)}>
           <option value="">Choisir un exercice</option>
@@ -83,26 +88,28 @@ export default function PersonalSessionForm({
 
       {error && <div className="errorBox">{error}</div>}
 
-      {sessionExercises.map(se => (
-        <ExerciseCard
+      {session.exercises.map(se => (
+        <ExerciseBlock
           key={se.id}
           sessionExercise={se}
           onAddSet={(payload) => onAddSet(se.id, payload)}
-          onDeleteSet={(setId) => onDeleteSet(se.id, setId)}
+          onDeleteSet={(setId) => onDeleteSet(setId)}
           onDelete={() => onDeleteExercise(se.id)}
         />
       ))}
 
-      {sessionExercises.length === 0 && (
-        <p className="muted" style={{ fontSize: 13, textAlign: 'center', padding: '1rem 0' }}>
-          Aucun exercice pour l&apos;instant.
+      {session.exercises.length === 0 && (
+        <p className="muted" style={{ fontSize: 13, textAlign: 'center', padding: '0.5rem 0' }}>
+          Aucun exercice pour l&apos;instant dans cette séance.
         </p>
       )}
     </div>
   )
 }
 
-function ExerciseCard({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
+function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
+  // Les valeurs restent en mémoire d'une série à l'autre : on ne les retape
+  // que si elles changent (ex: on augmente le poids sur la série suivante).
   const [reps, setReps] = useState('')
   const [weight, setWeight] = useState('')
   const [rest, setRest] = useState('')
@@ -116,11 +123,11 @@ function ExerciseCard({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
       rest_sec: rest ? Number(rest) : null,
       rpe: rpe ? Number(rpe) : null,
     })
-    setReps(''); setWeight(''); setRest(''); setRpe('')
+    // Pas de reset : les champs restent pré-remplis pour la série suivante.
   }
 
   return (
-    <div className="card">
+    <div style={{ borderTop: '1px solid var(--border, #2A2A2A)', paddingTop: 12 }}>
       <div className="row" style={{ marginBottom: 4 }}>
         <div>
           <p style={{ fontWeight: 500 }}>{sessionExercise.exercise?.name}</p>
@@ -136,7 +143,7 @@ function ExerciseCard({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
               <span>
                 Série {i + 1} · {s.reps} reps
                 {s.weight_kg ? ` · ${s.weight_kg}kg` : ''}
-                {s.rest_sec ? ` · ${s.rest_sec}s repos` : ''}
+                {s.rest_sec ? ` · ${REST_OPTIONS.find(r => Number(r.value) === s.rest_sec)?.label || `${s.rest_sec}s`} repos` : ''}
                 {s.rpe ? ` · RPE ${s.rpe}` : ''}
               </span>
               <button type="button" className="btn btnGhost btnSm" onClick={() => onDeleteSet(s.id)}>×</button>
@@ -148,7 +155,14 @@ function ExerciseCard({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
       <div className="fieldGrid">
         <div><label>Reps</label><input type="number" min="1" value={reps} onChange={e => setReps(e.target.value)} /></div>
         <div><label>Poids (kg)</label><input type="number" min="0" step="0.5" value={weight} onChange={e => setWeight(e.target.value)} placeholder="opt." /></div>
-        <div><label>Repos (s)</label><input type="number" min="0" value={rest} onChange={e => setRest(e.target.value)} placeholder="opt." /></div>
+      </div>
+      <div className="fieldGrid" style={{ marginTop: 8 }}>
+        <div>
+          <label>Repos</label>
+          <select value={rest} onChange={e => setRest(e.target.value)}>
+            {REST_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+        </div>
         <div><label>RPE</label><input type="number" min="1" max="10" step="0.5" value={rpe} onChange={e => setRpe(e.target.value)} placeholder="opt." /></div>
       </div>
       <button type="button" className="btn btnGhost btnBlock" style={{ marginTop: 8 }} onClick={handleAddSet} disabled={!reps}>
