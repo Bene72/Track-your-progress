@@ -24,7 +24,6 @@ export default function PersonalTrainingPage() {
   }
 
   const dateLabel = new Date(pt.viewDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-  const isToday = pt.viewDate === new Date().toISOString().slice(0, 10)
 
   const handleCreate = async () => {
     setCreating(true)
@@ -60,7 +59,7 @@ export default function PersonalTrainingPage() {
                 style={{ marginTop: 4, fontSize: 12, padding: '4px 8px', width: 'auto' }}
               />
             </div>
-            <button type="button" className="btn btnGhost btnSm" onClick={() => pt.changeDate(addDaysStr(pt.viewDate, 1))} disabled={isToday && false} aria-label="Jour suivant">→</button>
+            <button type="button" className="btn btnGhost btnSm" onClick={() => pt.changeDate(addDaysStr(pt.viewDate, 1))} aria-label="Jour suivant">→</button>
           </div>
 
           {pt.sessions.map(session => (
