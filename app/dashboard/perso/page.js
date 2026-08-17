@@ -377,15 +377,30 @@ export default function PersonalTrainingPage() {
                   >
                     {deletingId === session.id ? '...' : '🗑 Supprimer'}
                   </button>
+                  {/*
+                    NOTE (refonte "blocs") : session.blocks remplace session.exercises.
+                    Chaque bloc = { id, block_type, rounds, interval_sec, time_cap_sec,
+                    result_time_sec, result_rounds, result_reps, exercises: [...] }.
+                    PersonalSessionCard doit être adapté pour :
+                      - afficher un bloc entier (ex: "EMOM 8" avec ses N mouvements listés
+                        ensemble, pas N cartes séparées)
+                      - permettre de glisser un exercice existant d'un bloc vers un autre
+                        via pt.moveExerciseToBlock(blockExerciseId, targetBlockId)
+                      - ajouter un mouvement à un bloc via pt.addExerciseToBlock(blockId, exId, opts)
+                      - créer un nouveau bloc via pt.createBlock(session.id, blockType, opts)
+                    Envoie-moi PersonalSessionCard.jsx pour que je fasse cette adaptation.
+                  */}
                   <PersonalSessionCard
                     session={session}
                     catalogByMuscle={pt.catalogByMuscle}
-                    onAddExercise={(exId, supersetGroup) => pt.addExercise(session.id, exId, supersetGroup)}
+                    onCreateBlock={(blockType, opts) => pt.createBlock(session.id, blockType, opts)}
+                    onDeleteBlock={pt.deleteBlock}
+                    onAddExerciseToBlock={pt.addExerciseToBlock}
+                    onRemoveExerciseFromBlock={pt.removeExerciseFromBlock}
+                    onMoveExerciseToBlock={pt.moveExerciseToBlock}
                     onAddCustomExercise={pt.addCustomExercise}
-                    onAddSet={pt.addSet}
-                    onDeleteSet={pt.deleteSet}
-                    onDeleteExercise={pt.deleteSessionExercise}
-                    onSetSupersetGroup={pt.setSupersetGroup}
+                    onUpsertSetLog={pt.upsertSetLog}
+                    onSetBlockResult={pt.setBlockResult}
                   />
                 </div>
               ))}
