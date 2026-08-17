@@ -459,7 +459,7 @@ export default function PersonalSessionCard({
 
         {isNewBlockMode && (
           <>
-            <div className="row-2">
+            <div className={newBlockType === 'emom' ? 'row-3' : 'row-2'}>
               <div>
                 <label className="label">Type de bloc</label>
                 <select className="type-select" value={newBlockType} onChange={e => setNewBlockType(e.target.value)}>
@@ -478,6 +478,13 @@ export default function PersonalSessionCard({
                   <label className="label">Time cap (sec)</label>
                   <input className="mini-input" type="number" min="1" value={newBlockTimeCap}
                     onChange={e => setNewBlockTimeCap(e.target.value)} />
+                </div>
+              )}
+              {newBlockType === 'emom' && (
+                <div>
+                  <label className="label">Intervalle (sec)</label>
+                  <input className="mini-input" type="number" min="1" value={newBlockInterval}
+                    onChange={e => setNewBlockInterval(e.target.value)} />
                 </div>
               )}
             </div>
@@ -511,7 +518,7 @@ export default function PersonalSessionCard({
         {showCustomForm && (
           <form onSubmit={handleAddCustom} className="custom-form">
             <div>
-              <label className="label">Nom de l'exercice</label>
+              <label className="label">Nom de l&apos;exercice</label>
               <input className="custom-input" value={customName} onChange={e => setCustomName(e.target.value)}
                 placeholder="Ex. Développé Arnold" maxLength={80} required />
             </div>
@@ -589,7 +596,7 @@ export default function PersonalSessionCard({
         )}
 
         {blocks.length === 0 && (
-          <div className="empty">Aucun bloc dans cette séance pour l'instant.</div>
+          <div className="empty">Aucun bloc dans cette séance pour l&apos;instant.</div>
         )}
       </div>
     </div>
