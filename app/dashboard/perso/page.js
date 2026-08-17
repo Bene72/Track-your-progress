@@ -6,6 +6,25 @@ import { usePersonalTraining } from '../../../lib/hooks/usePersonalTraining'
 import PersonalSessionCard from '../../../components/PersonalSessionCard'
 import WeeklyVolumeChart from '../../../components/WeeklyVolumeChart'
 
+const FR_WEEKDAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi']
+const FR_MONTHS = [
+  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+]
+
+// Formatage manuel ("lundi 17 août"), volontairement sans Intl/toLocaleDateString :
+// le rendu serveur (Vercel) et le rendu client peuvent différer sur la locale
+// 'fr-FR' selon les données ICU disponibles, ce qui casse l'hydratation React
+// (erreurs #418 / #423). Un format manuel est déterministe et identique
+// des deux côtés, donc aucun besoin de passer par useEffect.
+function formatDateFrLong(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  const weekday = FR_WEEKDAYS[d.getDay()]
+  const day = d.getDate()
+  const month = FR_MONTHS[d.getMonth()]
+  return `${weekday} ${day} ${month}`
+}
+
 function addDaysStr(dateStr, days) {
   const d = new Date(dateStr + 'T00:00:00')
   d.setDate(d.getDate() + days)
@@ -28,11 +47,7 @@ export default function PersonalTrainingPage() {
     )
   }
 
-  const dateLabel = new Date(pt.viewDate + 'T00:00:00').toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  })
+  const dateLabel = formatDateFrLong(pt.viewDate)
 
   const handleDeleteSession = async (sessionId) => {
     if (!window.confirm('Supprimer cette séance ? Cette action est irréversible.')) return
@@ -377,19 +392,6 @@ export default function PersonalTrainingPage() {
                   >
                     {deletingId === session.id ? '...' : '🗑 Supprimer'}
                   </button>
-                  {/*
-                    NOTE (refonte "blocs") : session.blocks remplace session.exercises.
-                    Chaque bloc = { id, block_type, rounds, interval_sec, time_cap_sec,
-                    result_time_sec, result_rounds, result_reps, exercises: [...] }.
-                    PersonalSessionCard doit être adapté pour :
-                      - afficher un bloc entier (ex: "EMOM 8" avec ses N mouvements listés
-                        ensemble, pas N cartes séparées)
-                      - permettre de glisser un exercice existant d'un bloc vers un autre
-                        via pt.moveExerciseToBlock(blockExerciseId, targetBlockId)
-                      - ajouter un mouvement à un bloc via pt.addExerciseToBlock(blockId, exId, opts)
-                      - créer un nouveau bloc via pt.createBlock(session.id, blockType, opts)
-                    Envoie-moi PersonalSessionCard.jsx pour que je fasse cette adaptation.
-                  */}
                   <PersonalSessionCard
                     session={session}
                     catalogByMuscle={pt.catalogByMuscle}
