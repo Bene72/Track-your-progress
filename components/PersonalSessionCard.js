@@ -7,16 +7,20 @@ export default function PersonalSessionCard({
   session,
   catalogByMuscle,
   onAddExercise,
+  onAddExerciseToSuperset,
   onAddCustomExercise,
   onAddSet,
   onDeleteSet,
   onDeleteExercise,
+  onMoveExercise,
 }) {
   const [selectedExerciseId, setSelectedExerciseId] = useState('')
+  const [selectedSupersetPosition, setSelectedSupersetPosition] = useState(null)
   const [showCustomForm, setShowCustomForm] = useState(false)
   const [customName, setCustomName] = useState('')
   const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS[0].value)
   const [error, setError] = useState(null)
+  const [draggedExercise, setDraggedExercise] = useState(null)
 
   const [timeLabel, setTimeLabel] = useState('')
   useEffect(() => {
@@ -26,12 +30,28 @@ export default function PersonalSessionCard({
     }))
   }, [session.created_at])
 
+  // Grouper les exercices par position (superset)
+  const exercisesByPosition = {}
+  session.exercises.forEach(se => {
+    const pos = se.position ?? 0
+    if (!exercisesByPosition[pos]) exercisesByPosition[pos] = []
+    exercisesByPosition[pos].push(se)
+  })
+  const positions = Object.keys(exercisesByPosition).map(Number).sort((a, b) => a - b)
+
   const handleAddExercise = async () => {
     if (!selectedExerciseId) return
     setError(null)
     try {
-      await onAddExercise(selectedExerciseId)
+      if (selectedSupersetPosition !== null && selectedSupersetPosition !== '') {
+        // Ajouter au superset existant
+        await onAddExerciseToSuperset(selectedExerciseId, Number(selectedSupersetPosition))
+      } else {
+        // Ajouter comme nouvel exercice
+        await onAddExercise(selectedExerciseId)
+      }
       setSelectedExerciseId('')
+      setSelectedSupersetPosition(null)
     } catch (err) {
       setError(err.message)
     }
@@ -46,10 +66,46 @@ export default function PersonalSessionCard({
       const created = await onAddCustomExercise(customName.trim(), customMuscle)
       setCustomName('')
       setShowCustomForm(false)
-      await onAddExercise(created.id)
+      
+      if (selectedSupersetPosition !== null && selectedSupersetPosition !== '') {
+        await onAddExerciseToSuperset(created.id, Number(selectedSupersetPosition))
+      } else {
+        await onAddExercise(created.id)
+      }
+      setSelectedExerciseId('')
+      setSelectedSupersetPosition(null)
     } catch (err) {
       setError(err.message)
     }
+  }
+
+  const handleDragStart = (e, seId) => {
+    setDraggedExercise(seId)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleDrop = async (e, targetPosition) => {
+    e.preventDefault()
+    if (!draggedExercise) return
+    
+    try {
+      await onMoveExercise(draggedExercise, targetPosition)
+    } catch (err) {
+      setError(err.message)
+    }
+    setDraggedExercise(null)
+  }
+
+  const getSupersetLabel = (position) => {
+    const positionsList = Object.keys(exercisesByPosition)
+    const index = positionsList.indexOf(String(position))
+    if (index === -1) return ''
+    return `Superset ${index + 1}`
   }
 
   return (
@@ -157,6 +213,26 @@ export default function PersonalSessionCard({
           box-shadow: 0 0 0 3px rgba(249,115,22,.1);
         }
 
+        .superset-select {
+          width: 100%;
+          box-sizing: border-box;
+          min-height: 42px;
+          padding: 0 12px;
+          border: 1px solid var(--psc-border);
+          border-radius: 11px;
+          color: inherit;
+          background: rgba(255,255,255,.045);
+          font: inherit;
+          font-size: 13px;
+          outline: none;
+          transition: .18s ease;
+        }
+
+        .superset-select:focus {
+          border-color: rgba(249,115,22,.7);
+          box-shadow: 0 0 0 3px rgba(249,115,22,.1);
+        }
+
         .action-row {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -220,6 +296,44 @@ export default function PersonalSessionCard({
           margin-top: 16px;
         }
 
+        .superset-group {
+          border: 1px solid rgba(249,115,22,.15);
+          border-radius: 12px;
+          padding: 8px;
+          background: rgba(249,115,22,.04);
+        }
+
+        .superset-header {
+          font-size: 10px;
+          font-weight: 800;
+          text-transform: uppercase;
+          color: #FDBA74;
+          padding: 4px 8px;
+          margin-bottom: 6px;
+          letter-spacing: .08em;
+        }
+
+        .exercise-item {
+          padding: 8px 10px;
+          margin-bottom: 4px;
+          border-radius: 8px;
+          background: rgba(255,255,255,.03);
+          cursor: grab;
+          transition: .18s ease;
+        }
+
+        .exercise-item:last-child { margin-bottom: 0; }
+
+        .exercise-item.dragging {
+          opacity: .4;
+          border: 1px dashed rgba(249,115,22,.4);
+        }
+
+        .exercise-item.drag-over {
+          border-color: rgba(249,115,22,.6);
+          background: rgba(249,115,22,.08);
+        }
+
         .empty {
           padding: 22px 12px;
           border: 1px dashed var(--psc-border);
@@ -227,6 +341,23 @@ export default function PersonalSessionCard({
           color: var(--psc-muted);
           text-align: center;
           font-size: 12px;
+        }
+
+        .drop-zone {
+          border: 1px dashed rgba(249,115,22,.2);
+          border-radius: 8px;
+          padding: 12px;
+          text-align: center;
+          color: rgba(255,255,255,.3);
+          font-size: 11px;
+          transition: .18s ease;
+          margin-top: 4px;
+        }
+
+        .drop-zone.drag-over {
+          border-color: rgba(249,115,22,.6);
+          background: rgba(249,115,22,.06);
+          color: rgba(255,255,255,.6);
         }
 
         @media (max-width: 520px) {
@@ -263,6 +394,24 @@ export default function PersonalSessionCard({
             </optgroup>
           ))}
         </select>
+
+        {positions.length > 0 && (
+          <>
+            <label className="label" style={{ marginTop: 10 }}>Ajouter à un superset (optionnel)</label>
+            <select
+              className="superset-select"
+              value={selectedSupersetPosition ?? ''}
+              onChange={e => setSelectedSupersetPosition(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">Nouvel exercice seul</option>
+              {positions.map(pos => (
+                <option key={pos} value={pos}>
+                  {getSupersetLabel(pos)} ({exercisesByPosition[pos].map(e => e.exercise?.name).join(' + ')})
+                </option>
+              ))}
+            </select>
+          </>
+        )}
 
         <div className="action-row">
           <button
@@ -319,15 +468,60 @@ export default function PersonalSessionCard({
       {error && <div className="error">{error}</div>}
 
       <div className="exercise-list">
-        {session.exercises.map(se => (
-          <ExerciseBlock
-            key={se.id}
-            sessionExercise={se}
-            onAddSet={(payload) => onAddSet(se.id, payload)}
-            onDeleteSet={onDeleteSet}
-            onDelete={() => onDeleteExercise(se.id)}
-          />
-        ))}
+        {positions.map(pos => {
+          const exercises = exercisesByPosition[pos]
+          const isSuperset = exercises.length > 1
+          
+          return (
+            <div 
+              key={pos} 
+              className={isSuperset ? 'superset-group' : ''}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, pos)}
+            >
+              {isSuperset && (
+                <div className="superset-header">
+                  🔄 {getSupersetLabel(pos)} — {exercises.map(e => e.exercise?.name).join(' + ')}
+                  <span style={{ fontSize: 9, fontWeight: 400, color: 'rgba(255,255,255,.4)', marginLeft: 8 }}>
+                    (glisse un exercice pour changer de groupe)
+                  </span>
+                </div>
+              )}
+              
+              {exercises.map(se => (
+                <div
+                  key={se.id}
+                  className={`exercise-item ${draggedExercise === se.id ? 'dragging' : ''}`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, se.id)}
+                  onDragEnd={() => setDraggedExercise(null)}
+                >
+                  <ExerciseBlock
+                    sessionExercise={se}
+                    onAddSet={(payload) => onAddSet(se.id, payload)}
+                    onDeleteSet={onDeleteSet}
+                    onDelete={() => onDeleteExercise(se.id)}
+                    isSuperset={isSuperset}
+                  />
+                </div>
+              ))}
+
+              {!isSuperset && positions.length > 1 && (
+                <div 
+                  className={`drop-zone ${draggedExercise ? 'drag-over' : ''}`}
+                  onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('drag-over') }}
+                  onDragLeave={(e) => e.currentTarget.classList.remove('drag-over')}
+                  onDrop={(e) => {
+                    e.currentTarget.classList.remove('drag-over')
+                    handleDrop(e, pos)
+                  }}
+                >
+                  Déposer ici pour ajouter à ce superset
+                </div>
+              )}
+            </div>
+          )
+        })}
 
         {session.exercises.length === 0 && (
           <div className="empty">
@@ -339,7 +533,7 @@ export default function PersonalSessionCard({
   )
 }
 
-function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
+function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete, isSuperset }) {
   const [reps, setReps] = useState('')
   const [weight, setWeight] = useState('')
   const [rest, setRest] = useState('')
@@ -353,14 +547,16 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
       rest_sec: rest ? Number(rest) : null,
       rpe: rpe ? Number(rpe) : null,
     })
+    setReps('')
+    setWeight('')
+    setRpe('')
   }
 
   return (
     <div className="exercise-block">
       <style jsx>{`
         .exercise-block {
-          padding-top: 14px;
-          border-top: 1px solid rgba(255,255,255,.075);
+          position: relative;
         }
 
         .exercise-head {
@@ -368,22 +564,34 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
           align-items: center;
           justify-content: space-between;
           gap: 12px;
-          margin-bottom: 10px;
+          margin-bottom: 8px;
         }
 
         .exercise-name {
-          margin: 0 0 3px;
-          font-size: 14px;
+          margin: 0 0 2px;
+          font-size: 13px;
           font-weight: 850;
         }
 
         .exercise-muscle {
           margin: 0;
           color: rgba(255,255,255,.45);
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 700;
           letter-spacing: .07em;
           text-transform: uppercase;
+        }
+
+        .exercise-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .drag-handle {
+          color: rgba(255,255,255,.2);
+          font-size: 14px;
+          cursor: grab;
         }
 
         .delete-btn {
@@ -399,8 +607,8 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
 
         .sets {
           display: grid;
-          gap: 5px;
-          margin-bottom: 11px;
+          gap: 4px;
+          margin-bottom: 8px;
         }
 
         .set-row {
@@ -408,17 +616,17 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
           grid-template-columns: 1fr auto;
           align-items: center;
           gap: 8px;
-          padding: 8px 10px;
+          padding: 5px 8px;
           border: 1px solid rgba(255,255,255,.055);
-          border-radius: 9px;
+          border-radius: 7px;
           background: rgba(255,255,255,.03);
-          font-size: 11px;
+          font-size: 10px;
         }
 
         .set-main {
           display: flex;
           flex-wrap: wrap;
-          gap: 5px 9px;
+          gap: 4px 8px;
           color: rgba(255,255,255,.68);
         }
 
@@ -429,24 +637,27 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
           color: rgba(255,255,255,.35);
           background: transparent;
           cursor: pointer;
-          font-size: 15px;
+          font-size: 14px;
         }
 
         .remove-set:hover { color: #ff8d8d; }
 
-        .input-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 8px;
+        .input-row {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
         }
 
-        .input-grid + .input-grid { margin-top: 8px; }
+        .input-group {
+          flex: 1;
+          min-width: 50px;
+        }
 
         .field-label {
           display: block;
-          margin-bottom: 5px;
+          margin-bottom: 3px;
           color: rgba(255,255,255,.45);
-          font-size: 9px;
+          font-size: 8px;
           font-weight: 800;
           letter-spacing: .08em;
           text-transform: uppercase;
@@ -455,14 +666,14 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
         .field-input {
           width: 100%;
           box-sizing: border-box;
-          min-height: 38px;
-          padding: 0 10px;
+          min-height: 32px;
+          padding: 0 8px;
           border: 1px solid rgba(255,255,255,.08);
-          border-radius: 9px;
+          border-radius: 7px;
           color: white;
           background: rgba(255,255,255,.035);
           font: inherit;
-          font-size: 12px;
+          font-size: 11px;
           outline: none;
         }
 
@@ -473,14 +684,14 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
 
         .add-set {
           width: 100%;
-          min-height: 40px;
-          margin-top: 8px;
+          min-height: 32px;
+          margin-top: 6px;
           border: 1px solid rgba(249,115,22,.28);
-          border-radius: 10px;
+          border-radius: 8px;
           color: #FDBA74;
           background: rgba(249,115,22,.07);
           font: inherit;
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 800;
           cursor: pointer;
           transition: .18s ease;
@@ -493,22 +704,36 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
 
         .add-set:disabled { opacity: .35; cursor: not-allowed; }
 
-        @media (max-width: 440px) {
-          .set-main { gap: 3px 7px; }
+        .superset-badge {
+          display: inline-block;
+          padding: 1px 8px;
+          margin-left: 8px;
+          border-radius: 4px;
+          background: rgba(249,115,22,.15);
+          color: #FDBA74;
+          font-size: 8px;
+          font-weight: 700;
+          text-transform: uppercase;
         }
       `}</style>
 
       <div className="exercise-head">
         <div>
-          <p className="exercise-name">{sessionExercise.exercise?.name}</p>
+          <p className="exercise-name">
+            {sessionExercise.exercise?.name}
+            {isSuperset && <span className="superset-badge">Superset</span>}
+          </p>
           <p className="exercise-muscle">
             {MUSCLE_GROUP_LABELS[sessionExercise.exercise?.muscle_group] || sessionExercise.exercise?.muscle_group}
           </p>
         </div>
 
-        <button type="button" className="delete-btn" onClick={onDelete}>
-          Supprimer
-        </button>
+        <div className="exercise-actions">
+          <span className="drag-handle">⠿</span>
+          <button type="button" className="delete-btn" onClick={onDelete}>
+            Supprimer
+          </button>
+        </div>
       </div>
 
       {sessionExercise.sets.length > 0 && (
@@ -521,7 +746,7 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
                 {s.weight_kg ? <span>{s.weight_kg} kg</span> : null}
                 {s.rest_sec ? (
                   <span>
-                    {REST_OPTIONS.find(r => Number(r.value) === s.rest_sec)?.label || `${s.rest_sec}s`} repos
+                    {REST_OPTIONS.find(r => Number(r.value) === s.rest_sec)?.label || `${s.rest_sec}s`}
                   </span>
                 ) : null}
                 {s.rpe ? <span>RPE {s.rpe}</span> : null}
@@ -540,8 +765,8 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
         </div>
       )}
 
-      <div className="input-grid">
-        <div>
+      <div className="input-row">
+        <div className="input-group" style={{ flex: 1 }}>
           <label className="field-label">Reps</label>
           <input
             className="field-input"
@@ -553,8 +778,8 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
           />
         </div>
 
-        <div>
-          <label className="field-label">Poids · kg</label>
+        <div className="input-group" style={{ flex: 1 }}>
+          <label className="field-label">Poids</label>
           <input
             className="field-input"
             type="number"
@@ -562,14 +787,12 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
             step="0.5"
             value={weight}
             onChange={e => setWeight(e.target.value)}
-            placeholder="Optionnel"
+            placeholder="kg"
             inputMode="decimal"
           />
         </div>
-      </div>
 
-      <div className="input-grid">
-        <div>
+        <div className="input-group" style={{ flex: 0.8 }}>
           <label className="field-label">Repos</label>
           <select
             className="field-input"
@@ -582,7 +805,7 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
           </select>
         </div>
 
-        <div>
+        <div className="input-group" style={{ flex: 0.6 }}>
           <label className="field-label">RPE</label>
           <input
             className="field-input"
@@ -592,20 +815,20 @@ function ExerciseBlock({ sessionExercise, onAddSet, onDeleteSet, onDelete }) {
             step="0.5"
             value={rpe}
             onChange={e => setRpe(e.target.value)}
-            placeholder="Optionnel"
+            placeholder="RPE"
             inputMode="decimal"
           />
         </div>
-      </div>
 
-      <button
-        type="button"
-        className="add-set"
-        onClick={handleAddSet}
-        disabled={!reps}
-      >
-        ＋ Ajouter la série
-      </button>
+        <button
+          type="button"
+          className="add-set"
+          onClick={handleAddSet}
+          disabled={!reps}
+        >
+          ＋ Série
+        </button>
+      </div>
     </div>
   )
 }
