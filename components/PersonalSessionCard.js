@@ -564,7 +564,6 @@ export default function PersonalSessionCard({
                 />
               ) : block.block_type === 'emom' && block.exercises.length > 1 ? (
                 <EmomGroup
-                  block={block}
                   exercises={block.exercises}
                   onUpsertSetLog={onUpsertSetLog}
                   onRemoveExerciseFromBlock={onRemoveExerciseFromBlock}
@@ -893,93 +892,129 @@ function SupersetGroup({ exercises, onUpsertSetLog, onRemoveExerciseFromBlock })
   )
 }
 
-// Affiche un EMOM à plusieurs mouvements sous forme compacte : une seule ligne
-// par exercice ("Nom — 10 reps"), sans lister chaque round individuellement
-// (le nombre de rounds est déjà visible dans le sous-titre du bloc, ex. "EMOM 8").
-// Éditer les champs applique la même valeur à tous les rounds du mouvement en un clic.
-function EmomGroup({ block, exercises, onUpsertSetLog, onRemoveExerciseFromBlock }) {
-  const rounds = block.rounds || Math.max(0, ...exercises.map(e => e.logs?.length || 0))
+// Affiche un EMOM à plusieurs mouvements sur le même principe que le superset :
+// chaque round montre les exercices côte à côte ("R1  3 reps + 10 reps"), et un
+// seul bouton "+ Round" enregistre le round pour tous les mouvements à la fois.
+function EmomGroup({ exercises, onUpsertSetLog, onRemoveExerciseFromBlock }) {
+  const maxRounds = Math.max(0, ...exercises.map(e => e.logs?.length || 0))
+  const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1)
+
+  const [inputs, setInputs] = useState(
+    exercises.map(e => ({
+      reps: e.target_reps ?? '',
+      weight: e.target_weight_kg ?? '',
+      distance: e.target_distance_m ?? '',
+    }))
+  )
+
+  const updateInput = (idx, field, value) => {
+    setInputs(prev => prev.map((p, i) => (i === idx ? { ...p, [field]: value } : p)))
+  }
+
+  const canAdd = inputs.some(inp => inp.reps || inp.distance)
+
+  const handleAddRound = async () => {
+    const nextRound = maxRounds + 1
+    await Promise.all(
+      exercises.map((e, i) => {
+        const inp = inputs[i]
+        if (!inp.reps && !inp.distance) return null
+        return onUpsertSetLog(e.id, nextRound, {
+          reps: inp.reps ? Number(inp.reps) : null,
+          weight_kg: inp.weight ? Number(inp.weight) : null,
+          distance_m: inp.distance ? Number(inp.distance) : null,
+        })
+      })
+    )
+  }
 
   return (
     <div className="emom-group">
       <style jsx>{`
-        .emom-group { display: grid; gap: 8px; }
-        .emom-row { padding: 8px 10px; border: 1px solid rgba(255,255,255,.06); border-radius: 10px; background: rgba(255,255,255,.025); }
-        .emom-row-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-        .emom-name { font-size: 12px; font-weight: 800; }
-        .emom-row-head button { border: 0; color: rgba(255,255,255,.38); background: transparent; font: inherit; font-size: 10px; cursor: pointer; font-weight: 700; }
-        .emom-row-head button:hover { color: #ff8d8d; }
-        .emom-row-inputs { display: flex; gap: 6px; align-items: flex-end; flex-wrap: wrap; }
-        .input-group { flex: 1; min-width: 46px; }
+        .emom-group { position: relative; }
+        .emom-title { margin: 0 0 8px; font-size: 13px; font-weight: 850; }
+        .emom-title .sep { color: rgba(255,255,255,.35); font-weight: 700; padding: 0 6px; }
+        .emom-rounds { display: grid; gap: 4px; margin-bottom: 10px; }
+        .emom-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid rgba(255,255,255,.055); border-radius: 7px; background: rgba(255,255,255,.03); font-size: 10px; color: rgba(255,255,255,.72); }
+        .emom-row strong { color: white; margin-right: 2px; }
+        .emom-row .plus { color: rgba(255,255,255,.3); padding: 0 4px; }
+        .emom-inputs { display: grid; gap: 10px; }
+        .emom-ex-block { border-top: 1px dashed rgba(255,255,255,.07); padding-top: 8px; }
+        .emom-ex-block:first-child { border-top: 0; padding-top: 0; }
+        .emom-ex-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .emom-ex-label span { color: rgba(255,255,255,.55); font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+        .emom-ex-label button { border: 0; color: rgba(255,255,255,.38); background: transparent; font: inherit; font-size: 10px; cursor: pointer; font-weight: 700; }
+        .emom-ex-label button:hover { color: #ff8d8d; }
+        .emom-ex-inputs { display: flex; gap: 6px; flex-wrap: wrap; }
+        .input-group { flex: 1; min-width: 50px; }
         .field-label { display: block; margin-bottom: 3px; color: rgba(255,255,255,.45); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
         .field-input { width: 100%; box-sizing: border-box; min-height: 32px; padding: 0 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: white; background: rgba(255,255,255,.035); font: inherit; font-size: 11px; outline: none; }
         .field-input:focus { border-color: rgba(249,115,22,.65); box-shadow: 0 0 0 3px rgba(249,115,22,.09); }
-        .emom-save { min-height: 32px; padding: 0 12px; border: 1px solid rgba(249,115,22,.28); border-radius: 8px; color: #FDBA74; background: rgba(249,115,22,.07); font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; transition: .18s ease; }
-        .emom-save:hover:not(:disabled) { background: rgba(249,115,22,.14); border-color: rgba(249,115,22,.55); }
-        .emom-save:disabled { opacity: .45; cursor: not-allowed; }
+        .add-set { width: 100%; min-height: 34px; margin-top: 4px; border: 1px solid rgba(249,115,22,.28); border-radius: 8px; color: #FDBA74; background: rgba(249,115,22,.07); font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; transition: .18s ease; }
+        .add-set:hover:not(:disabled) { background: rgba(249,115,22,.14); border-color: rgba(249,115,22,.55); }
+        .add-set:disabled { opacity: .35; cursor: not-allowed; }
       `}</style>
-      {exercises.map(e => (
-        <EmomRow
-          key={e.id}
-          exercise={e}
-          rounds={rounds}
-          onUpsertSetLog={onUpsertSetLog}
-          onRemove={() => onRemoveExerciseFromBlock(e.id)}
-        />
-      ))}
-    </div>
-  )
-}
 
-function EmomRow({ exercise, rounds, onUpsertSetLog, onRemove }) {
-  const firstLog = exercise.logs?.[0]
-  const [reps, setReps] = useState(firstLog?.reps ?? exercise.target_reps ?? '')
-  const [weight, setWeight] = useState(firstLog?.weight_kg ?? exercise.target_weight_kg ?? '')
-  const [distance, setDistance] = useState(firstLog?.distance_m ?? exercise.target_distance_m ?? '')
-  const [saving, setSaving] = useState(false)
+      <p className="emom-title">
+        {exercises.map((e, i) => (
+          <span key={e.id}>
+            {i > 0 && <span className="sep">+</span>}
+            {e.exercise?.name}
+          </span>
+        ))}
+      </p>
 
-  const handleSave = async () => {
-    if (!rounds) return
-    setSaving(true)
-    try {
-      await Promise.all(
-        Array.from({ length: rounds }, (_, i) => i + 1).map(r =>
-          onUpsertSetLog(exercise.id, r, {
-            reps: reps ? Number(reps) : null,
-            weight_kg: weight ? Number(weight) : null,
-            distance_m: distance ? Number(distance) : null,
-          })
-        )
-      )
-    } finally {
-      setSaving(false)
-    }
-  }
+      {rounds.length > 0 && (
+        <div className="emom-rounds">
+          {rounds.map(r => (
+            <div key={r} className="emom-row">
+              <strong>R{r}</strong>
+              {exercises.map((e, i) => {
+                const log = e.logs?.find(l => l.round_number === r)
+                const parts = []
+                if (log?.reps != null) parts.push(`${log.reps} reps`)
+                if (log?.weight_kg) parts.push(`${log.weight_kg} kg`)
+                if (log?.distance_m) parts.push(`${log.distance_m} m`)
+                return (
+                  <span key={e.id}>
+                    {i > 0 && <span className="plus">+</span>}
+                    {parts.length ? parts.join(' · ') : '—'}
+                  </span>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      )}
 
-  return (
-    <div className="emom-row">
-      <div className="emom-row-head">
-        <span className="emom-name">{exercise.exercise?.name}</span>
-        <button type="button" onClick={onRemove}>Retirer</button>
-      </div>
-      <div className="emom-row-inputs">
-        <div className="input-group">
-          <label className="field-label">Reps</label>
-          <input className="field-input" type="number" min="0" value={reps}
-            onChange={e => setReps(e.target.value)} inputMode="numeric" />
-        </div>
-        <div className="input-group">
-          <label className="field-label">Poids</label>
-          <input className="field-input" type="number" min="0" step="0.5" value={weight}
-            onChange={e => setWeight(e.target.value)} placeholder="kg" inputMode="decimal" />
-        </div>
-        <div className="input-group">
-          <label className="field-label">Distance</label>
-          <input className="field-input" type="number" min="0" value={distance}
-            onChange={e => setDistance(e.target.value)} placeholder="m" inputMode="numeric" />
-        </div>
-        <button type="button" className="emom-save" onClick={handleSave} disabled={saving}>
-          {saving ? '...' : 'OK'}
+      <div className="emom-inputs">
+        {exercises.map((e, i) => (
+          <div key={e.id} className="emom-ex-block">
+            <div className="emom-ex-label">
+              <span>{e.exercise?.name}</span>
+              <button type="button" onClick={() => onRemoveExerciseFromBlock(e.id)}>Retirer</button>
+            </div>
+            <div className="emom-ex-inputs">
+              <div className="input-group">
+                <label className="field-label">Reps</label>
+                <input className="field-input" type="number" min="0" value={inputs[i].reps}
+                  onChange={ev => updateInput(i, 'reps', ev.target.value)} inputMode="numeric" />
+              </div>
+              <div className="input-group">
+                <label className="field-label">Poids</label>
+                <input className="field-input" type="number" min="0" step="0.5" value={inputs[i].weight}
+                  onChange={ev => updateInput(i, 'weight', ev.target.value)} placeholder="kg" inputMode="decimal" />
+              </div>
+              <div className="input-group">
+                <label className="field-label">Distance</label>
+                <input className="field-input" type="number" min="0" value={inputs[i].distance}
+                  onChange={ev => updateInput(i, 'distance', ev.target.value)} placeholder="m" inputMode="numeric" />
+              </div>
+            </div>
+          </div>
+        ))}
+        <button type="button" className="add-set" onClick={handleAddRound} disabled={!canAdd}>
+          ＋ Round {maxRounds + 1} (tous les mouvements)
         </button>
       </div>
     </div>
