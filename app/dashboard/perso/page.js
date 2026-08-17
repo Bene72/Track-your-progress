@@ -223,10 +223,10 @@ export default function PersonalTrainingPage() {
         }
 
         .delete-btn {
-          padding: 6px 12px;
-          border: 1px solid rgba(255,0,0,.3);
+          padding: 6px 14px;
+          border: 1px solid rgba(239,68,68,.3);
           border-radius: 8px;
-          background: rgba(255,0,0,.1);
+          background: rgba(239,68,68,.1);
           color: #ef4444;
           font-size: 12px;
           cursor: pointer;
@@ -234,7 +234,7 @@ export default function PersonalTrainingPage() {
         }
 
         .delete-btn:hover:not(:disabled) {
-          background: rgba(255,0,0,.2);
+          background: rgba(239,68,68,.2);
           border-color: #ef4444;
         }
 
@@ -390,14 +390,13 @@ export default function PersonalTrainingPage() {
                   <PersonalSessionCard
                     session={session}
                     catalogByMuscle={pt.catalogByMuscle}
-                    onAddExercise={(exId) => pt.addExercise(session.id, exId)}
-                    onAddExerciseToSuperset={(exId, position) => pt.addExerciseToSuperset(session.id, exId, position)}
+                    onAddExercise={pt.addExercise}
+                    onAddExerciseToSuperset={pt.addExerciseToSuperset}
                     onAddCustomExercise={pt.addCustomExercise}
                     onAddSet={pt.addSet}
                     onDeleteSet={pt.deleteSet}
                     onDeleteExercise={pt.deleteSessionExercise}
                     onMoveExercise={pt.moveExercise}
-                    sessionExercises={session.exercises}
                   />
                 </div>
               ))}
