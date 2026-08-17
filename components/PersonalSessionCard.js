@@ -556,22 +556,30 @@ export default function PersonalSessionCard({
                 </button>
               </div>
 
-              {block.exercises.map(be => (
-                <div
-                  key={be.id}
-                  className={`exercise-item ${draggedBeId === be.id ? 'dragging' : ''}`}
-                  draggable
-                  onDragStart={() => setDraggedBeId(be.id)}
-                  onDragEnd={() => setDraggedBeId(null)}
-                >
-                  <MovementBlock
-                    blockExercise={be}
-                    blockType={block.block_type}
-                    onUpsertSetLog={(round, payload) => onUpsertSetLog(be.id, round, payload)}
-                    onRemove={() => onRemoveExerciseFromBlock(be.id)}
-                  />
-                </div>
-              ))}
+              {block.block_type === 'superset' && block.exercises.length > 1 ? (
+                <SupersetGroup
+                  exercises={block.exercises}
+                  onUpsertSetLog={onUpsertSetLog}
+                  onRemoveExerciseFromBlock={onRemoveExerciseFromBlock}
+                />
+              ) : (
+                block.exercises.map(be => (
+                  <div
+                    key={be.id}
+                    className={`exercise-item ${draggedBeId === be.id ? 'dragging' : ''}`}
+                    draggable
+                    onDragStart={() => setDraggedBeId(be.id)}
+                    onDragEnd={() => setDraggedBeId(null)}
+                  >
+                    <MovementBlock
+                      blockExercise={be}
+                      blockType={block.block_type}
+                      onUpsertSetLog={(round, payload) => onUpsertSetLog(be.id, round, payload)}
+                      onRemove={() => onRemoveExerciseFromBlock(be.id)}
+                    />
+                  </div>
+                ))
+              )}
 
               {block.exercises.length === 0 && (
                 <div className="empty" style={{ padding: 14 }}>Aucun mouvement dans ce bloc.</div>
@@ -744,6 +752,136 @@ function MovementBlock({ blockExercise, blockType, onUpsertSetLog, onRemove }) {
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+// Affiche un superset (2+ mouvements) sur des lignes combinées : chaque round
+// montre les deux exercices côte à côte ("10 reps + 10 reps"), et un seul
+// bouton "+ Round" enregistre le round pour tous les mouvements du superset
+// en une seule action.
+function SupersetGroup({ exercises, onUpsertSetLog, onRemoveExerciseFromBlock }) {
+  const maxRounds = Math.max(0, ...exercises.map(e => e.logs?.length || 0))
+  const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1)
+
+  const [inputs, setInputs] = useState(
+    exercises.map(e => ({
+      reps: e.target_reps ?? '',
+      weight: e.target_weight_kg ?? '',
+      distance: e.target_distance_m ?? '',
+    }))
+  )
+
+  const updateInput = (idx, field, value) => {
+    setInputs(prev => prev.map((p, i) => (i === idx ? { ...p, [field]: value } : p)))
+  }
+
+  const canAdd = inputs.some(inp => inp.reps || inp.distance)
+
+  const handleAddRound = async () => {
+    const nextRound = maxRounds + 1
+    await Promise.all(
+      exercises.map((e, i) => {
+        const inp = inputs[i]
+        if (!inp.reps && !inp.distance) return null
+        return onUpsertSetLog(e.id, nextRound, {
+          reps: inp.reps ? Number(inp.reps) : null,
+          weight_kg: inp.weight ? Number(inp.weight) : null,
+          distance_m: inp.distance ? Number(inp.distance) : null,
+        })
+      })
+    )
+  }
+
+  return (
+    <div className="superset-group">
+      <style jsx>{`
+        .superset-group { position: relative; }
+        .superset-title { margin: 0 0 8px; font-size: 13px; font-weight: 850; }
+        .superset-title .sep { color: rgba(255,255,255,.35); font-weight: 700; padding: 0 6px; }
+        .superset-rounds { display: grid; gap: 4px; margin-bottom: 10px; }
+        .superset-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid rgba(255,255,255,.055); border-radius: 7px; background: rgba(255,255,255,.03); font-size: 10px; color: rgba(255,255,255,.72); }
+        .superset-row strong { color: white; margin-right: 2px; }
+        .superset-row .plus { color: rgba(255,255,255,.3); padding: 0 4px; }
+        .superset-inputs { display: grid; gap: 10px; }
+        .superset-ex-block { border-top: 1px dashed rgba(255,255,255,.07); padding-top: 8px; }
+        .superset-ex-block:first-child { border-top: 0; padding-top: 0; }
+        .superset-ex-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .superset-ex-label span { color: rgba(255,255,255,.55); font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+        .superset-ex-label button { border: 0; color: rgba(255,255,255,.38); background: transparent; font: inherit; font-size: 10px; cursor: pointer; font-weight: 700; }
+        .superset-ex-label button:hover { color: #ff8d8d; }
+        .superset-ex-inputs { display: flex; gap: 6px; flex-wrap: wrap; }
+        .input-group { flex: 1; min-width: 50px; }
+        .field-label { display: block; margin-bottom: 3px; color: rgba(255,255,255,.45); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+        .field-input { width: 100%; box-sizing: border-box; min-height: 32px; padding: 0 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: white; background: rgba(255,255,255,.035); font: inherit; font-size: 11px; outline: none; }
+        .field-input:focus { border-color: rgba(249,115,22,.65); box-shadow: 0 0 0 3px rgba(249,115,22,.09); }
+        .add-set { width: 100%; min-height: 34px; margin-top: 4px; border: 1px solid rgba(249,115,22,.28); border-radius: 8px; color: #FDBA74; background: rgba(249,115,22,.07); font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; transition: .18s ease; }
+        .add-set:hover:not(:disabled) { background: rgba(249,115,22,.14); border-color: rgba(249,115,22,.55); }
+        .add-set:disabled { opacity: .35; cursor: not-allowed; }
+      `}</style>
+
+      <p className="superset-title">
+        {exercises.map((e, i) => (
+          <span key={e.id}>
+            {i > 0 && <span className="sep">+</span>}
+            {e.exercise?.name}
+          </span>
+        ))}
+      </p>
+
+      {rounds.length > 0 && (
+        <div className="superset-rounds">
+          {rounds.map(r => (
+            <div key={r} className="superset-row">
+              <strong>R{r}</strong>
+              {exercises.map((e, i) => {
+                const log = e.logs?.find(l => l.round_number === r)
+                const parts = []
+                if (log?.reps != null) parts.push(`${log.reps} reps`)
+                if (log?.weight_kg) parts.push(`${log.weight_kg} kg`)
+                if (log?.distance_m) parts.push(`${log.distance_m} m`)
+                return (
+                  <span key={e.id}>
+                    {i > 0 && <span className="plus">+</span>}
+                    {parts.length ? parts.join(' · ') : '—'}
+                  </span>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="superset-inputs">
+        {exercises.map((e, i) => (
+          <div key={e.id} className="superset-ex-block">
+            <div className="superset-ex-label">
+              <span>{e.exercise?.name}</span>
+              <button type="button" onClick={() => onRemoveExerciseFromBlock(e.id)}>Retirer</button>
+            </div>
+            <div className="superset-ex-inputs">
+              <div className="input-group">
+                <label className="field-label">Reps</label>
+                <input className="field-input" type="number" min="0" value={inputs[i].reps}
+                  onChange={ev => updateInput(i, 'reps', ev.target.value)} inputMode="numeric" />
+              </div>
+              <div className="input-group">
+                <label className="field-label">Poids</label>
+                <input className="field-input" type="number" min="0" step="0.5" value={inputs[i].weight}
+                  onChange={ev => updateInput(i, 'weight', ev.target.value)} placeholder="kg" inputMode="decimal" />
+              </div>
+              <div className="input-group">
+                <label className="field-label">Distance</label>
+                <input className="field-input" type="number" min="0" value={inputs[i].distance}
+                  onChange={ev => updateInput(i, 'distance', ev.target.value)} placeholder="m" inputMode="numeric" />
+              </div>
+            </div>
+          </div>
+        ))}
+        <button type="button" className="add-set" onClick={handleAddRound} disabled={!canAdd}>
+          ＋ Round {maxRounds + 1} (les deux mouvements)
+        </button>
+      </div>
     </div>
   )
 }
