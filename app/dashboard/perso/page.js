@@ -17,7 +17,7 @@ export default function PersonalTrainingPage() {
   const pt = usePersonalTraining(userId)
   const [tab, setTab] = useState('add')
   const [creating, setCreating] = useState(false)
-  const [deleting, setDeleting] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
 
   if (pt.loading) {
     return (
@@ -34,22 +34,22 @@ export default function PersonalTrainingPage() {
     month: 'long',
   })
 
+  const handleDeleteSession = async (sessionId) => {
+    if (!window.confirm('Supprimer cette séance ? Cette action est irréversible.')) return
+    setDeletingId(sessionId)
+    try {
+      await pt.deleteSession(sessionId)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   const handleCreate = async () => {
     setCreating(true)
     try {
       await pt.createSession()
     } finally {
       setCreating(false)
-    }
-  }
-
-  const handleDeleteSession = async (sessionId) => {
-    if (!confirm('Supprimer cette séance entièrement ?')) return
-    setDeleting(sessionId)
-    try {
-      await pt.deleteSession(sessionId)
-    } finally {
-      setDeleting(null)
     }
   }
 
@@ -210,38 +210,31 @@ export default function PersonalTrainingPage() {
           gap: 14px;
         }
 
-        .session-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 8px;
-        }
+        .session-block { position: relative; }
 
-        .session-time {
+        .delete-session-btn {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          z-index: 2;
+          padding: 6px 10px;
+          border: 1px solid rgba(248,113,113,.4);
+          border-radius: 10px;
+          color: #fca5a5;
+          background: rgba(248,113,113,.1);
+          font: inherit;
           font-size: 12px;
-          color: var(--p-muted);
-        }
-
-        .delete-btn {
-          padding: 6px 14px;
-          border: 1px solid rgba(239,68,68,.3);
-          border-radius: 8px;
-          background: rgba(239,68,68,.1);
-          color: #ef4444;
-          font-size: 12px;
+          font-weight: 700;
           cursor: pointer;
           transition: .2s ease;
         }
 
-        .delete-btn:hover:not(:disabled) {
-          background: rgba(239,68,68,.2);
-          border-color: #ef4444;
+        .delete-session-btn:hover:not(:disabled) {
+          background: rgba(248,113,113,.2);
+          border-color: rgba(248,113,113,.6);
         }
 
-        .delete-btn:disabled {
-          opacity: .5;
-          cursor: wait;
-        }
+        .delete-session-btn:disabled { opacity: .55; cursor: wait; }
 
         .empty-state {
           padding: 38px 20px;
@@ -374,29 +367,25 @@ export default function PersonalTrainingPage() {
 
             <div className="sessions">
               {pt.sessions.map(session => (
-                <div key={session.id}>
-                  <div className="session-header">
-                    <span className="session-time">
-                      {new Date(session.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    <button
-                      className="delete-btn"
-                      onClick={() => handleDeleteSession(session.id)}
-                      disabled={deleting === session.id}
-                    >
-                      {deleting === session.id ? 'Suppression...' : '🗑 Supprimer'}
-                    </button>
-                  </div>
+                <div key={session.id} className="session-block">
+                  <button
+                    type="button"
+                    className="delete-session-btn"
+                    onClick={() => handleDeleteSession(session.id)}
+                    disabled={deletingId === session.id}
+                    aria-label="Supprimer cette séance"
+                  >
+                    {deletingId === session.id ? '...' : '🗑 Supprimer'}
+                  </button>
                   <PersonalSessionCard
                     session={session}
                     catalogByMuscle={pt.catalogByMuscle}
-                    onAddExercise={pt.addExercise}
-                    onAddExerciseToSuperset={pt.addExerciseToSuperset}
+                    onAddExercise={(exId, supersetGroup) => pt.addExercise(session.id, exId, supersetGroup)}
                     onAddCustomExercise={pt.addCustomExercise}
                     onAddSet={pt.addSet}
                     onDeleteSet={pt.deleteSet}
                     onDeleteExercise={pt.deleteSessionExercise}
-                    onMoveExercise={pt.moveExercise}
+                    onSetSupersetGroup={pt.setSupersetGroup}
                   />
                 </div>
               ))}
