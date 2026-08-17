@@ -5,17 +5,41 @@ import { usePrData } from '../../../lib/hooks/usePrData'
 import { PR_VALUE_TYPES, formatSecondsToClock, clockToSeconds } from '../../../lib/constants'
 import { prSchema, sanitizeText } from '../../../lib/security'
 
+// Formatage manuel (DD/MM/YYYY), volontairement sans Intl/toLocaleDateString :
+// le rendu serveur (Vercel) et le rendu client peuvent avoir des données ICU
+// différentes pour la locale 'fr-FR', ce qui casse l'hydratation React
+// (erreurs #418 / #423). Un format manuel est déterministe et identique
+// des deux côtés.
+function formatDateFr(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  return `${dd}/${mm}/${yyyy}`
+}
+
 function formatPrValue(r) {
   if (r.value_type === 'time') return formatSecondsToClock(r.value_number)
   if (r.value_type === 'weight') return `${r.value_number} kg`
   return `${r.value_number} reps`
 }
 
+// Date du jour au format YYYY-MM-DD, en local (pas UTC), pour préremplir le
+// champ <input type="date">. Évite aussi toute dépendance à toISOString()
+// qui utilise UTC et peut décaler le jour selon le fuseau horaire.
+function todayLocalKey() {
+  const d = new Date()
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
 function AddPrForm({ onSubmit, onDone }) {
   const [movement, setMovement] = useState('')
   const [valueType, setValueType] = useState('weight')
   const [rawValue, setRawValue] = useState('')
-  const [achievedAt, setAchievedAt] = useState(new Date().toISOString().slice(0, 10))
+  const [achievedAt, setAchievedAt] = useState(() => todayLocalKey())
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -124,7 +148,7 @@ export default function PrPage() {
               <div key={r.id} className="row">
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{r.movement}</div>
-                  <div className="muted" style={{ fontSize: 12 }}>{new Date(r.achieved_at + 'T00:00:00').toLocaleDateString('fr-FR')}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>{formatDateFr(r.achieved_at)}</div>
                 </div>
                 <div className="row" style={{ gap: 10, width: 'auto' }}>
                   <span className="mono" style={{ fontWeight: 700 }}>{formatPrValue(r)}</span>
