@@ -107,6 +107,7 @@ export default function PersonalSessionCard({
   catalogByMuscle,
   onCreateBlock,
   onDeleteBlock,
+  onUpdateBlock,
   onAddExerciseToBlock,
   onRemoveExerciseFromBlock,
   onMoveExerciseToBlock,
@@ -129,6 +130,7 @@ export default function PersonalSessionCard({
   const [error, setError] = useState(null)
   const [draggedBeId, setDraggedBeId] = useState(null)
   const [dragOverBlockId, setDragOverBlockId] = useState(null)
+  const [editingBlockId, setEditingBlockId] = useState(null)
 
   const [timeLabel, setTimeLabel] = useState('')
   useEffect(() => {
@@ -435,6 +437,18 @@ export default function PersonalSessionCard({
 
         .block-sub { color: rgba(255,255,255,.4); font-size: 9px; font-weight: 600; text-transform: none; letter-spacing: 0; }
 
+        .block-header-actions { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
+
+        .block-edit {
+          border: 0;
+          color: rgba(255,255,255,.35);
+          background: transparent;
+          font: inherit;
+          font-size: 11px;
+          cursor: pointer;
+        }
+        .block-edit:hover { color: #FDBA74; }
+
         .block-delete {
           border: 0;
           color: rgba(255,255,255,.35);
@@ -625,10 +639,30 @@ export default function PersonalSessionCard({
                   {BLOCK_TYPE_ICON[block.block_type]} {BLOCK_TYPE_LABEL[block.block_type]}
                   <span className="block-sub">{blockSubtitle(block)}</span>
                 </div>
-                <button type="button" className="block-delete" onClick={() => onDeleteBlock(block.id)}>
-                  Supprimer le bloc
-                </button>
+                <div className="block-header-actions">
+                  <button
+                    type="button"
+                    className="block-edit"
+                    onClick={() => setEditingBlockId(cur => (cur === block.id ? null : block.id))}
+                  >
+                    {editingBlockId === block.id ? 'Fermer' : 'Modifier'}
+                  </button>
+                  <button type="button" className="block-delete" onClick={() => onDeleteBlock(block.id)}>
+                    Supprimer le bloc
+                  </button>
+                </div>
               </div>
+
+              {editingBlockId === block.id && (
+                <BlockSettingsForm
+                  block={block}
+                  onSave={async vals => {
+                    await onUpdateBlock(block.id, vals)
+                    setEditingBlockId(null)
+                  }}
+                  onCancel={() => setEditingBlockId(null)}
+                />
+              )}
 
               {block.block_type === 'superset' && block.exercises.length > 1 ? (
                 <SupersetGroup
@@ -772,6 +806,75 @@ function AddToBlockInline({ blockId, catalog, onAddExerciseToBlock }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function BlockSettingsForm({ block, onSave, onCancel }) {
+  const [rounds, setRounds] = useState(block.rounds ?? '')
+  const [interval, setIntervalSec] = useState(block.interval_sec ?? '')
+  const [timeCap, setTimeCap] = useState(block.time_cap_sec ?? '')
+  const [saving, setSaving] = useState(false)
+
+  const showRounds = ROUNDS_TYPES.has(block.block_type)
+  const showInterval = block.block_type === 'emom'
+  const showTimeCap = block.block_type === 'amrap' || block.block_type === 'for_time'
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave({
+        rounds: showRounds ? (rounds ? Number(rounds) : null) : undefined,
+        intervalSec: showInterval ? (interval ? Number(interval) : null) : undefined,
+        timeCapSec: showTimeCap ? (timeCap ? Number(timeCap) : null) : undefined,
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="block-settings">
+      <style jsx>{`
+        .block-settings { padding: 10px; margin-bottom: 10px; border: 1px solid rgba(249,115,22,.28); border-radius: 10px; background: rgba(249,115,22,.045); }
+        .block-settings-fields { display: flex; gap: 8px; flex-wrap: wrap; }
+        .input-group { flex: 1; min-width: 90px; }
+        .field-label { display: block; margin-bottom: 3px; color: rgba(255,255,255,.45); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+        .field-input { width: 100%; box-sizing: border-box; min-height: 32px; padding: 0 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: white; background: rgba(255,255,255,.035); font: inherit; font-size: 11px; outline: none; }
+        .field-input:focus { border-color: rgba(249,115,22,.65); box-shadow: 0 0 0 3px rgba(249,115,22,.09); }
+        .block-settings-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .block-settings-actions button { flex: 1; min-height: 32px; border-radius: 8px; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; border: 1px solid transparent; }
+        .cancel-settings { color: rgba(255,255,255,.5); background: transparent; border-color: rgba(255,255,255,.12) !important; }
+        .save-settings { color: #FDBA74; background: rgba(249,115,22,.12); border-color: rgba(249,115,22,.32) !important; }
+        .save-settings:hover:not(:disabled) { background: rgba(249,115,22,.2); }
+        .save-settings:disabled { opacity: .5; cursor: not-allowed; }
+      `}</style>
+      <div className="block-settings-fields">
+        {showRounds && (
+          <div className="input-group">
+            <label className="field-label">{block.block_type === 'emom' ? 'Durée (min)' : 'Rounds'}</label>
+            <input className="field-input" type="number" min="1" value={rounds} onChange={e => setRounds(e.target.value)} />
+          </div>
+        )}
+        {showInterval && (
+          <div className="input-group">
+            <label className="field-label">Intervalle (sec)</label>
+            <input className="field-input" type="number" min="1" value={interval} onChange={e => setIntervalSec(e.target.value)} />
+          </div>
+        )}
+        {showTimeCap && (
+          <div className="input-group">
+            <label className="field-label">Time cap (sec)</label>
+            <input className="field-input" type="number" min="1" value={timeCap} onChange={e => setTimeCap(e.target.value)} />
+          </div>
+        )}
+      </div>
+      <div className="block-settings-actions">
+        <button type="button" className="cancel-settings" onClick={onCancel}>Annuler</button>
+        <button type="button" className="save-settings" onClick={handleSave} disabled={saving}>
+          {saving ? '...' : 'Enregistrer'}
+        </button>
+      </div>
     </div>
   )
 }
