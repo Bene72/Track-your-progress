@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { MUSCLE_GROUPS, MUSCLE_GROUP_LABELS, REST_OPTIONS } from '../lib/constants'
 
 const BLOCK_TYPES = [
@@ -21,6 +21,85 @@ function blockSubtitle(block) {
   if (block.block_type === 'for_time') return `${block.rounds || '?'} rounds for time`
   if (block.block_type === 'superset') return `Superset · ${block.rounds || '?'} rounds`
   return `${block.rounds || '?'} séries`
+}
+
+function normalizeText(s) {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+// Champ de saisie libre avec suggestions filtrées en direct (ex: "fe" trouve
+// "Fentes avant", "Fentes bulgares", "Développé Arnold"... peu importe où la
+// sous-chaîne apparaît dans le nom). Remplace le <select> classique.
+function ExerciseAutocomplete({ catalog, value, onChange, placeholder }) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef(null)
+
+  useEffect(() => {
+    if (!value) return
+    const ex = catalog.find(e => e.id === value)
+    if (ex) setQuery(ex.name)
+  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const filtered = query.trim()
+    ? catalog.filter(ex => normalizeText(ex.name).includes(normalizeText(query))).slice(0, 40)
+    : catalog.slice(0, 40)
+
+  const handleSelect = (ex) => {
+    onChange(ex.id)
+    setQuery(ex.name)
+    setOpen(false)
+  }
+
+  const handleInputChange = (e) => {
+    const v = e.target.value
+    setQuery(v)
+    setOpen(true)
+    if (value) onChange('')
+  }
+
+  return (
+    <div className="ex-autocomplete" ref={wrapRef}>
+      <style jsx>{`
+        .ex-autocomplete { position: relative; }
+        .ex-ac-input { width: 100%; box-sizing: border-box; min-height: 32px; padding: 0 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: white; background: rgba(255,255,255,.035); font: inherit; font-size: 11px; outline: none; }
+        .ex-ac-input:focus { border-color: rgba(249,115,22,.65); box-shadow: 0 0 0 3px rgba(249,115,22,.09); }
+        .ex-ac-list { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0; max-height: 230px; overflow-y: auto; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: #181818; box-shadow: 0 14px 34px rgba(0,0,0,.45); }
+        .ex-ac-item { padding: 9px 12px; font-size: 12px; color: rgba(255,255,255,.82); cursor: pointer; }
+        .ex-ac-item:hover { background: rgba(249,115,22,.16); color: white; }
+        .ex-ac-empty { padding: 10px 12px; font-size: 11px; color: rgba(255,255,255,.4); }
+      `}</style>
+      <input
+        className="ex-ac-input"
+        type="text"
+        value={query}
+        placeholder={placeholder || 'Rechercher un exercice…'}
+        onChange={handleInputChange}
+        onFocus={() => setOpen(true)}
+      />
+      {open && (
+        <div className="ex-ac-list">
+          {filtered.length > 0 ? (
+            filtered.map(ex => (
+              <div key={ex.id} className="ex-ac-item" onMouseDown={() => handleSelect(ex)}>
+                {ex.name}
+              </div>
+            ))
+          ) : (
+            <div className="ex-ac-empty">Aucun exercice trouvé</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function PersonalSessionCard({
@@ -61,12 +140,15 @@ export default function PersonalSessionCard({
 
   const blocks = session.blocks || []
   const isNewBlockMode = selectedBlockId === ''
+  const sortedCatalog = Object.values(catalogByMuscle).flat().sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+  const [pickerResetKey, setPickerResetKey] = useState(0)
 
   const resetAddForm = () => {
     setSelectedExerciseId('')
     setTargetReps('')
     setTargetWeight('')
     setTargetDistance('')
+    setPickerResetKey(k => k + 1)
   }
 
   const handleAddExercise = async (exerciseId) => {
@@ -428,20 +510,12 @@ export default function PersonalSessionCard({
 
       <div className="add-area">
         <label className="label">Exercice</label>
-        <select
-          className="exercise-select"
+        <ExerciseAutocomplete
+          key={pickerResetKey}
+          catalog={sortedCatalog}
           value={selectedExerciseId}
-          onChange={e => setSelectedExerciseId(e.target.value)}
-        >
-          <option value="">Choisir un exercice…</option>
-          {Object.keys(catalogByMuscle).sort().map(muscle => (
-            <optgroup key={muscle} label={MUSCLE_GROUP_LABELS[muscle] || muscle}>
-              {catalogByMuscle[muscle].map(ex => (
-                <option key={ex.id} value={ex.id}>{ex.name}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+          onChange={setSelectedExerciseId}
+        />
 
         <label className="label" style={{ marginTop: 10 }}>Destination</label>
         <select
@@ -591,6 +665,12 @@ export default function PersonalSessionCard({
                 <div className="empty" style={{ padding: 14 }}>Aucun mouvement dans ce bloc.</div>
               )}
 
+              <AddToBlockInline
+                blockId={block.id}
+                catalog={sortedCatalog}
+                onAddExerciseToBlock={onAddExerciseToBlock}
+              />
+
               {RESULT_TYPES.has(block.block_type) && (
                 <ResultForm block={block} onSubmit={vals => onSetBlockResult(block.id, vals)} />
               )}
@@ -613,6 +693,85 @@ export default function PersonalSessionCard({
           <div className="empty">Aucun bloc dans cette séance pour l&apos;instant.</div>
         )}
       </div>
+    </div>
+  )
+}
+
+function AddToBlockInline({ blockId, catalog, onAddExerciseToBlock }) {
+  const [open, setOpen] = useState(false)
+  const [exerciseId, setExerciseId] = useState('')
+  const [reps, setReps] = useState('')
+  const [weight, setWeight] = useState('')
+  const [distance, setDistance] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  const handleAdd = async () => {
+    if (!exerciseId) return
+    setSaving(true)
+    setError(null)
+    try {
+      await onAddExerciseToBlock(blockId, exerciseId, {
+        targetReps: reps ? Number(reps) : null,
+        targetWeightKg: weight ? Number(weight) : null,
+        targetDistanceM: distance ? Number(distance) : null,
+      })
+      setExerciseId('')
+      setReps('')
+      setWeight('')
+      setDistance('')
+      setOpen(false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="add-to-block">
+      <style jsx>{`
+        .add-to-block { margin-top: 10px; }
+        .add-to-block-toggle { width: 100%; min-height: 34px; border: 1px dashed rgba(255,255,255,.16); border-radius: 9px; color: rgba(255,255,255,.55); background: transparent; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; transition: .18s ease; }
+        .add-to-block-toggle:hover { border-color: rgba(249,115,22,.5); color: #FDBA74; background: rgba(249,115,22,.06); }
+        .add-to-block-form { padding: 10px; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; background: rgba(255,255,255,.025); display: grid; gap: 8px; }
+        .field-input { width: 100%; box-sizing: border-box; min-height: 32px; padding: 0 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: white; background: rgba(255,255,255,.035); font: inherit; font-size: 11px; outline: none; }
+        .field-input:focus { border-color: rgba(249,115,22,.65); box-shadow: 0 0 0 3px rgba(249,115,22,.09); }
+        .add-to-block-targets { display: flex; gap: 6px; }
+        .add-to-block-actions { display: flex; gap: 8px; }
+        .add-to-block-actions button { flex: 1; min-height: 32px; border-radius: 8px; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; border: 1px solid transparent; }
+        .btn-cancel { color: rgba(255,255,255,.5); background: transparent; border-color: rgba(255,255,255,.12) !important; }
+        .btn-cancel:hover { color: white; }
+        .btn-primary { color: #FDBA74; background: rgba(249,115,22,.1); border-color: rgba(249,115,22,.3) !important; }
+        .btn-primary:hover:not(:disabled) { background: rgba(249,115,22,.18); }
+        .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+        .add-to-block-error { color: #ff8d8d; font-size: 10px; }
+      `}</style>
+
+      {!open ? (
+        <button type="button" className="add-to-block-toggle" onClick={() => setOpen(true)}>
+          ＋ Ajouter un mouvement à ce bloc
+        </button>
+      ) : (
+        <div className="add-to-block-form">
+          <ExerciseAutocomplete catalog={catalog} value={exerciseId} onChange={setExerciseId} />
+          <div className="add-to-block-targets">
+            <input className="field-input" type="number" placeholder="Reps" value={reps}
+              onChange={e => setReps(e.target.value)} inputMode="numeric" />
+            <input className="field-input" type="number" placeholder="kg" value={weight}
+              onChange={e => setWeight(e.target.value)} inputMode="decimal" step="0.5" />
+            <input className="field-input" type="number" placeholder="m" value={distance}
+              onChange={e => setDistance(e.target.value)} inputMode="numeric" />
+          </div>
+          {error && <div className="add-to-block-error">{error}</div>}
+          <div className="add-to-block-actions">
+            <button type="button" className="btn-cancel" onClick={() => setOpen(false)}>Annuler</button>
+            <button type="button" className="btn-primary" onClick={handleAdd} disabled={!exerciseId || saving}>
+              {saving ? '...' : 'Ajouter'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -650,6 +809,94 @@ function ResultForm({ block, onSubmit }) {
   )
 }
 
+function EditableSetRow({ log, onUpsertSetLog }) {
+  const [editing, setEditing] = useState(false)
+  const [reps, setReps] = useState(log.reps ?? '')
+  const [weight, setWeight] = useState(log.weight_kg ?? '')
+  const [distance, setDistance] = useState(log.distance_m ?? '')
+  const [rest, setRest] = useState(log.rest_sec ?? '')
+  const [rpe, setRpe] = useState(log.rpe ?? '')
+
+  const handleSave = async () => {
+    await onUpsertSetLog(log.round_number, {
+      reps: reps ? Number(reps) : null,
+      weight_kg: weight ? Number(weight) : null,
+      distance_m: distance ? Number(distance) : null,
+      rest_sec: rest ? Number(rest) : null,
+      rpe: rpe ? Number(rpe) : null,
+    })
+    setEditing(false)
+  }
+
+  return (
+    <div className="editable-set-row">
+      <style jsx>{`
+        .set-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 8px; border: 1px solid rgba(255,255,255,.055); border-radius: 7px; background: rgba(255,255,255,.03); font-size: 10px; }
+        .set-main { display: flex; flex-wrap: wrap; gap: 4px 8px; color: rgba(255,255,255,.68); }
+        .set-main strong { color: white; }
+        .edit-set-btn { flex: 0 0 auto; border: 0; color: rgba(255,255,255,.38); background: transparent; font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; }
+        .edit-set-btn:hover { color: #FDBA74; }
+        .set-row-edit { padding: 8px; border: 1px solid rgba(249,115,22,.28); border-radius: 8px; background: rgba(249,115,22,.045); }
+        .input-row { display: flex; gap: 6px; flex-wrap: wrap; }
+        .input-group { flex: 1; min-width: 50px; }
+        .field-label { display: block; margin-bottom: 3px; color: rgba(255,255,255,.45); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+        .field-input { width: 100%; box-sizing: border-box; min-height: 32px; padding: 0 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: white; background: rgba(255,255,255,.035); font: inherit; font-size: 11px; outline: none; }
+        .field-input:focus { border-color: rgba(249,115,22,.65); box-shadow: 0 0 0 3px rgba(249,115,22,.09); }
+        .set-row-edit-actions { display: flex; gap: 8px; margin-top: 6px; }
+        .set-row-edit-actions button { flex: 1; min-height: 30px; border-radius: 7px; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; border: 1px solid transparent; }
+        .cancel-edit { color: rgba(255,255,255,.5); background: transparent; border-color: rgba(255,255,255,.12) !important; }
+        .save-edit { color: #FDBA74; background: rgba(249,115,22,.12); border-color: rgba(249,115,22,.32) !important; }
+        .save-edit:hover { background: rgba(249,115,22,.2); }
+      `}</style>
+
+      {!editing ? (
+        <div className="set-row">
+          <div className="set-main">
+            <span><strong>R{log.round_number}</strong></span>
+            {log.reps != null && <span>{log.reps} reps</span>}
+            {log.weight_kg ? <span>{log.weight_kg} kg</span> : null}
+            {log.distance_m ? <span>{log.distance_m} m</span> : null}
+            {log.rest_sec ? <span>{REST_OPTIONS.find(r => Number(r.value) === log.rest_sec)?.label || `${log.rest_sec}s`}</span> : null}
+            {log.rpe ? <span>RPE {log.rpe}</span> : null}
+          </div>
+          <button type="button" className="edit-set-btn" onClick={() => setEditing(true)}>Modifier</button>
+        </div>
+      ) : (
+        <div className="set-row-edit">
+          <div className="input-row">
+            <div className="input-group">
+              <label className="field-label">Reps</label>
+              <input className="field-input" type="number" min="0" value={reps} onChange={e => setReps(e.target.value)} inputMode="numeric" />
+            </div>
+            <div className="input-group">
+              <label className="field-label">Poids</label>
+              <input className="field-input" type="number" min="0" step="0.5" value={weight} onChange={e => setWeight(e.target.value)} placeholder="kg" inputMode="decimal" />
+            </div>
+            <div className="input-group" style={{ flex: 0.8 }}>
+              <label className="field-label">Distance</label>
+              <input className="field-input" type="number" min="0" value={distance} onChange={e => setDistance(e.target.value)} placeholder="m" inputMode="numeric" />
+            </div>
+            <div className="input-group" style={{ flex: 0.8 }}>
+              <label className="field-label">Repos</label>
+              <select className="field-input" value={rest} onChange={e => setRest(e.target.value)}>
+                {REST_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </div>
+            <div className="input-group" style={{ flex: 0.6 }}>
+              <label className="field-label">RPE</label>
+              <input className="field-input" type="number" min="1" max="10" step="0.5" value={rpe} onChange={e => setRpe(e.target.value)} placeholder="RPE" inputMode="decimal" />
+            </div>
+          </div>
+          <div className="set-row-edit-actions">
+            <button type="button" className="cancel-edit" onClick={() => setEditing(false)}>Annuler</button>
+            <button type="button" className="save-edit" onClick={handleSave}>Enregistrer</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function MovementBlock({ blockExercise, blockType, onUpsertSetLog, onRemove }) {
   const [reps, setReps] = useState(blockExercise.target_reps ?? '')
   const [weight, setWeight] = useState(blockExercise.target_weight_kg ?? '')
@@ -682,9 +929,6 @@ function MovementBlock({ blockExercise, blockType, onUpsertSetLog, onRemove }) {
         .delete-btn { border: 0; color: rgba(255,255,255,.38); background: transparent; font: inherit; font-size: 11px; cursor: pointer; }
         .delete-btn:hover { color: #ff8d8d; }
         .sets { display: grid; gap: 4px; margin-bottom: 8px; }
-        .set-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid rgba(255,255,255,.055); border-radius: 7px; background: rgba(255,255,255,.03); font-size: 10px; }
-        .set-main { display: flex; flex-wrap: wrap; gap: 4px 8px; color: rgba(255,255,255,.68); }
-        .set-main strong { color: white; }
         .input-row { display: flex; gap: 6px; flex-wrap: wrap; }
         .input-group { flex: 1; min-width: 50px; }
         .field-label { display: block; margin-bottom: 3px; color: rgba(255,255,255,.45); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
@@ -711,16 +955,7 @@ function MovementBlock({ blockExercise, blockType, onUpsertSetLog, onRemove }) {
       {blockExercise.logs?.length > 0 && (
         <div className="sets">
           {blockExercise.logs.map(l => (
-            <div key={l.id} className="set-row">
-              <div className="set-main">
-                <span><strong>R{l.round_number}</strong></span>
-                {l.reps != null && <span>{l.reps} reps</span>}
-                {l.weight_kg ? <span>{l.weight_kg} kg</span> : null}
-                {l.distance_m ? <span>{l.distance_m} m</span> : null}
-                {l.rest_sec ? <span>{REST_OPTIONS.find(r => Number(r.value) === l.rest_sec)?.label || `${l.rest_sec}s`}</span> : null}
-                {l.rpe ? <span>RPE {l.rpe}</span> : null}
-              </div>
-            </div>
+            <EditableSetRow key={l.id} log={l} onUpsertSetLog={onUpsertSetLog} />
           ))}
         </div>
       )}
@@ -766,6 +1001,103 @@ function MovementBlock({ blockExercise, blockType, onUpsertSetLog, onRemove }) {
 // montre les deux exercices côte à côte ("10 reps + 10 reps"), et un seul
 // bouton "+ Round" enregistre le round pour tous les mouvements du superset
 // en une seule action.
+function SupersetRoundRow({ round, exercises, onUpsertSetLog }) {
+  const [editing, setEditing] = useState(false)
+  const [inputs, setInputs] = useState(
+    exercises.map(e => {
+      const log = e.logs?.find(l => l.round_number === round)
+      return { reps: log?.reps ?? '', weight: log?.weight_kg ?? '', distance: log?.distance_m ?? '' }
+    })
+  )
+
+  const updateInput = (idx, field, value) => {
+    setInputs(prev => prev.map((p, i) => (i === idx ? { ...p, [field]: value } : p)))
+  }
+
+  const handleSave = async () => {
+    await Promise.all(
+      exercises.map((e, i) => {
+        const inp = inputs[i]
+        return onUpsertSetLog(e.id, round, {
+          reps: inp.reps ? Number(inp.reps) : null,
+          weight_kg: inp.weight ? Number(inp.weight) : null,
+          distance_m: inp.distance ? Number(inp.distance) : null,
+        })
+      })
+    )
+    setEditing(false)
+  }
+
+  return (
+    <div className="round-row-wrap">
+      <style jsx>{`
+        .superset-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid rgba(255,255,255,.055); border-radius: 7px; background: rgba(255,255,255,.03); font-size: 10px; color: rgba(255,255,255,.72); }
+        .superset-row strong { color: white; margin-right: 2px; }
+        .superset-row .plus { color: rgba(255,255,255,.3); padding: 0 4px; }
+        .superset-row .vals { flex: 1; display: flex; }
+        .edit-round-btn { flex: 0 0 auto; border: 0; color: rgba(255,255,255,.38); background: transparent; font: inherit; font-size: 10px; font-weight: 700; cursor: pointer; }
+        .edit-round-btn:hover { color: #FDBA74; }
+        .round-edit { padding: 8px; border: 1px solid rgba(249,115,22,.28); border-radius: 8px; background: rgba(249,115,22,.045); }
+        .round-edit-label { margin: 0 0 6px; color: #FDBA74; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+        .round-edit-ex { margin-bottom: 6px; }
+        .round-edit-ex:last-of-type { margin-bottom: 0; }
+        .round-edit-ex-name { display: block; margin-bottom: 4px; color: rgba(255,255,255,.55); font-size: 9px; font-weight: 700; }
+        .round-edit-inputs { display: flex; gap: 6px; }
+        .round-edit-inputs input { flex: 1; min-width: 0; box-sizing: border-box; min-height: 30px; padding: 0 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: white; background: rgba(255,255,255,.035); font: inherit; font-size: 11px; outline: none; }
+        .round-edit-inputs input:focus { border-color: rgba(249,115,22,.65); box-shadow: 0 0 0 3px rgba(249,115,22,.09); }
+        .round-edit-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .round-edit-actions button { flex: 1; min-height: 30px; border-radius: 7px; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; border: 1px solid transparent; }
+        .cancel-round { color: rgba(255,255,255,.5); background: transparent; border-color: rgba(255,255,255,.12) !important; }
+        .save-round { color: #FDBA74; background: rgba(249,115,22,.12); border-color: rgba(249,115,22,.32) !important; }
+        .save-round:hover { background: rgba(249,115,22,.2); }
+      `}</style>
+
+      {!editing ? (
+        <div className="superset-row">
+          <strong>R{round}</strong>
+          <div className="vals">
+            {exercises.map((e, i) => {
+              const log = e.logs?.find(l => l.round_number === round)
+              const parts = []
+              if (log?.reps != null) parts.push(`${log.reps} reps`)
+              if (log?.weight_kg) parts.push(`${log.weight_kg} kg`)
+              if (log?.distance_m) parts.push(`${log.distance_m} m`)
+              return (
+                <span key={e.id}>
+                  {i > 0 && <span className="plus">+</span>}
+                  {parts.length ? parts.join(' · ') : '—'}
+                </span>
+              )
+            })}
+          </div>
+          <button type="button" className="edit-round-btn" onClick={() => setEditing(true)}>Modifier</button>
+        </div>
+      ) : (
+        <div className="round-edit">
+          <p className="round-edit-label">Round {round}</p>
+          {exercises.map((e, i) => (
+            <div key={e.id} className="round-edit-ex">
+              <span className="round-edit-ex-name">{e.exercise?.name}</span>
+              <div className="round-edit-inputs">
+                <input type="number" min="0" placeholder="Reps" value={inputs[i].reps}
+                  onChange={ev => updateInput(i, 'reps', ev.target.value)} inputMode="numeric" />
+                <input type="number" min="0" step="0.5" placeholder="kg" value={inputs[i].weight}
+                  onChange={ev => updateInput(i, 'weight', ev.target.value)} inputMode="decimal" />
+                <input type="number" min="0" placeholder="m" value={inputs[i].distance}
+                  onChange={ev => updateInput(i, 'distance', ev.target.value)} inputMode="numeric" />
+              </div>
+            </div>
+          ))}
+          <div className="round-edit-actions">
+            <button type="button" className="cancel-round" onClick={() => setEditing(false)}>Annuler</button>
+            <button type="button" className="save-round" onClick={handleSave}>Enregistrer</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SupersetGroup({ exercises, onUpsertSetLog, onRemoveExerciseFromBlock }) {
   const maxRounds = Math.max(0, ...exercises.map(e => e.logs?.length || 0))
   const rounds = Array.from({ length: maxRounds }, (_, i) => i + 1)
@@ -806,9 +1138,6 @@ function SupersetGroup({ exercises, onUpsertSetLog, onRemoveExerciseFromBlock })
         .superset-title { margin: 0 0 8px; font-size: 13px; font-weight: 850; }
         .superset-title .sep { color: rgba(255,255,255,.35); font-weight: 700; padding: 0 6px; }
         .superset-rounds { display: grid; gap: 4px; margin-bottom: 10px; }
-        .superset-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid rgba(255,255,255,.055); border-radius: 7px; background: rgba(255,255,255,.03); font-size: 10px; color: rgba(255,255,255,.72); }
-        .superset-row strong { color: white; margin-right: 2px; }
-        .superset-row .plus { color: rgba(255,255,255,.3); padding: 0 4px; }
         .superset-inputs { display: grid; gap: 10px; }
         .superset-ex-block { border-top: 1px dashed rgba(255,255,255,.07); padding-top: 8px; }
         .superset-ex-block:first-child { border-top: 0; padding-top: 0; }
@@ -838,22 +1167,7 @@ function SupersetGroup({ exercises, onUpsertSetLog, onRemoveExerciseFromBlock })
       {rounds.length > 0 && (
         <div className="superset-rounds">
           {rounds.map(r => (
-            <div key={r} className="superset-row">
-              <strong>R{r}</strong>
-              {exercises.map((e, i) => {
-                const log = e.logs?.find(l => l.round_number === r)
-                const parts = []
-                if (log?.reps != null) parts.push(`${log.reps} reps`)
-                if (log?.weight_kg) parts.push(`${log.weight_kg} kg`)
-                if (log?.distance_m) parts.push(`${log.distance_m} m`)
-                return (
-                  <span key={e.id}>
-                    {i > 0 && <span className="plus">+</span>}
-                    {parts.length ? parts.join(' · ') : '—'}
-                  </span>
-                )
-              })}
-            </div>
+            <SupersetRoundRow key={r} round={r} exercises={exercises} onUpsertSetLog={onUpsertSetLog} />
           ))}
         </div>
       )}
