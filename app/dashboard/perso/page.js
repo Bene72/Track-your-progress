@@ -400,6 +400,7 @@ export default function PersonalTrainingPage() {
                     catalogByMuscle={pt.catalogByMuscle}
                     onCreateBlock={(blockType, opts) => pt.createBlock(session.id, blockType, opts)}
                     onDeleteBlock={pt.deleteBlock}
+                    onUpdateBlock={pt.updateBlock}
                     onAddExerciseToBlock={pt.addExerciseToBlock}
                     onRemoveExerciseFromBlock={pt.removeExerciseFromBlock}
                     onMoveExerciseToBlock={pt.moveExerciseToBlock}
