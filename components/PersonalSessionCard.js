@@ -23,6 +23,42 @@ function blockSubtitle(block) {
   return `${block.rounds || '?'} séries`
 }
 
+// Lettre du bloc (A/, B/, C/...) comme dans la programmation coach.
+function blockLetter(index) {
+  return String.fromCharCode(65 + (index % 26))
+}
+
+// Ligne de prescription "façon CrossFit" (grosse ligne au-dessus des mouvements),
+// dérivée des mêmes champs que blockSubtitle() mais formulée comme une consigne.
+function prescriptionLine(block) {
+  if (block.block_type === 'emom') {
+    const every = block.interval_sec ? `Every ${block.interval_sec}s` : 'Every round'
+    return `${every} x ${block.rounds || '?'} rounds`
+  }
+  if (block.block_type === 'amrap') {
+    return block.time_cap_sec ? `AMRAP ${Math.round(block.time_cap_sec / 60)}'` : 'AMRAP'
+  }
+  if (block.block_type === 'for_time') {
+    const cap = block.time_cap_sec ? ` (cap ${Math.round(block.time_cap_sec / 60)}')` : ''
+    return `For time${cap}`
+  }
+  if (block.block_type === 'superset') {
+    return `${block.rounds || '?'} rounds`
+  }
+  return `${block.rounds || '?'} séries`
+}
+
+// Ligne de cible pour un mouvement, ex. "12 Burpee over the DB @2x22.5kg".
+function movementTargetLine(be) {
+  const parts = []
+  if (be.target_reps != null) parts.push(`${be.target_reps}`)
+  parts.push(be.exercise?.name || '')
+  const tail = []
+  if (be.target_weight_kg) tail.push(`@${be.target_weight_kg}kg`)
+  if (be.target_distance_m) tail.push(`${be.target_distance_m}m`)
+  return { main: parts.filter(Boolean).join(' '), tail: tail.join(' ') }
+}
+
 function normalizeText(s) {
   return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
@@ -131,6 +167,16 @@ export default function PersonalSessionCard({
   const [draggedBeId, setDraggedBeId] = useState(null)
   const [dragOverBlockId, setDragOverBlockId] = useState(null)
   const [editingBlockId, setEditingBlockId] = useState(null)
+  const [closedBlockIds, setClosedBlockIds] = useState(() => new Set())
+
+  const toggleBlockOpen = (blockId) => {
+    setClosedBlockIds(prev => {
+      const next = new Set(prev)
+      if (next.has(blockId)) next.delete(blockId)
+      else next.add(blockId)
+      return next
+    })
+  }
 
   const [timeLabel, setTimeLabel] = useState('')
   useEffect(() => {
@@ -426,18 +472,132 @@ export default function PersonalSessionCard({
 
         .block-title {
           display: flex;
-          align-items: baseline;
-          gap: 8px;
-          font-size: 11px;
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: .07em;
+          align-items: center;
+          gap: 10px;
+          flex: 1;
+          min-width: 0;
+          cursor: pointer;
+        }
+
+        .block-letter {
+          flex: 0 0 auto;
+          font-size: 15px;
+          font-weight: 900;
+          color: white;
+        }
+
+        .block-title-text {
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 13px;
+          font-weight: 850;
           color: #FDBA74;
         }
+
+        .block-tag {
+          flex: 0 0 auto;
+          padding: 3px 8px;
+          border-radius: 7px;
+          color: #FDBA74;
+          background: rgba(249,115,22,.14);
+          border: 1px solid rgba(249,115,22,.3);
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: .04em;
+          text-transform: uppercase;
+        }
+
+        .block-chevron {
+          flex: 0 0 auto;
+          color: rgba(255,255,255,.4);
+          font-size: 13px;
+          transition: transform .18s ease;
+        }
+
+        .block-chevron.open { transform: rotate(90deg); }
 
         .block-sub { color: rgba(255,255,255,.4); font-size: 9px; font-weight: 600; text-transform: none; letter-spacing: 0; }
 
         .block-header-actions { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
+
+        .block-prescription {
+          margin: 2px 4px 10px;
+          padding: 10px 12px;
+          border: 1px solid rgba(255,255,255,.06);
+          border-radius: 10px;
+          background: rgba(0,0,0,.18);
+        }
+
+        .presc-rule { margin: 0 0 4px; font-size: 12px; font-weight: 850; color: white; }
+
+        .presc-move {
+          display: flex;
+          justify-content: space-between;
+          gap: 8px;
+          font-size: 11.5px;
+          line-height: 1.6;
+          color: rgba(255,255,255,.8);
+        }
+
+        .presc-move .tail { color: rgba(255,255,255,.55); text-decoration: underline; text-decoration-color: rgba(255,255,255,.25); text-underline-offset: 2px; white-space: nowrap; }
+
+        .block-body { overflow: hidden; }
+        .block-body.closed { display: none; }
+
+        .block-notes {
+          margin-top: 10px;
+          padding-top: 8px;
+          border-top: 1px solid rgba(255,255,255,.06);
+        }
+
+        .block-notes-label {
+          display: block;
+          margin-bottom: 6px;
+          color: rgba(255,255,255,.4);
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: .08em;
+          text-transform: uppercase;
+        }
+
+        .block-notes-input {
+          width: 100%;
+          box-sizing: border-box;
+          min-height: 54px;
+          padding: 8px 10px;
+          border: 1px solid var(--psc-border);
+          border-radius: 9px;
+          color: white;
+          background: rgba(255,255,255,.03);
+          font: inherit;
+          font-size: 11.5px;
+          line-height: 1.5;
+          resize: vertical;
+          outline: none;
+        }
+
+        .block-notes-input:focus { border-color: rgba(249,115,22,.65); box-shadow: 0 0 0 3px rgba(249,115,22,.09); }
+        .block-notes-input::placeholder { color: rgba(255,255,255,.28); }
+
+        .block-notes-save {
+          margin-top: 6px;
+          min-height: 28px;
+          padding: 0 10px;
+          border-radius: 7px;
+          border: 1px solid rgba(249,115,22,.28);
+          color: #FDBA74;
+          background: rgba(249,115,22,.08);
+          font: inherit;
+          font-size: 10px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+        .block-notes-save:hover:not(:disabled) { background: rgba(249,115,22,.16); }
+        .block-notes-save:disabled { opacity: .45; cursor: default; }
+        .block-notes-saved { margin-top: 6px; color: rgba(255,255,255,.35); font-size: 10px; }
 
         .block-edit {
           border: 0;
@@ -624,8 +784,9 @@ export default function PersonalSessionCard({
       {error && <div className="error">{error}</div>}
 
       <div className="block-list">
-        {blocks.map(block => {
+        {blocks.map((block, blockIdx) => {
           const isMulti = block.exercises.length > 1
+          const isOpen = !closedBlockIds.has(block.id)
           return (
             <div
               key={block.id}
@@ -635,9 +796,13 @@ export default function PersonalSessionCard({
               onDrop={e => { e.preventDefault(); handleDrop(block.id) }}
             >
               <div className="block-header">
-                <div className="block-title">
-                  {BLOCK_TYPE_ICON[block.block_type]} {BLOCK_TYPE_LABEL[block.block_type]}
-                  <span className="block-sub">{blockSubtitle(block)}</span>
+                <div className="block-title" onClick={() => toggleBlockOpen(block.id)}>
+                  <span className="block-letter">{blockLetter(blockIdx)}/</span>
+                  <span className="block-title-text">
+                    {block.exercises.map(e => e.exercise?.name).join(' + ') || 'Bloc vide'}
+                  </span>
+                  <span className="block-tag">{BLOCK_TYPE_ICON[block.block_type]} {BLOCK_TYPE_LABEL[block.block_type]}</span>
+                  <span className={`block-chevron ${isOpen ? 'open' : ''}`}>›</span>
                 </div>
                 <div className="block-header-actions">
                   <button
@@ -653,61 +818,78 @@ export default function PersonalSessionCard({
                 </div>
               </div>
 
-              {editingBlockId === block.id && (
-                <BlockSettingsForm
-                  block={block}
-                  onSave={async vals => {
-                    await onUpdateBlock(block.id, vals)
-                    setEditingBlockId(null)
-                  }}
-                  onCancel={() => setEditingBlockId(null)}
+              <div className="block-prescription">
+                <p className="presc-rule">{prescriptionLine(block)}</p>
+                {block.exercises.map(be => {
+                  const { main, tail } = movementTargetLine(be)
+                  return (
+                    <div key={be.id} className="presc-move">
+                      <span>{main}</span>
+                      {tail && <span className="tail">{tail}</span>}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className={`block-body ${isOpen ? '' : 'closed'}`}>
+                {editingBlockId === block.id && (
+                  <BlockSettingsForm
+                    block={block}
+                    onSave={async vals => {
+                      await onUpdateBlock(block.id, vals)
+                      setEditingBlockId(null)
+                    }}
+                    onCancel={() => setEditingBlockId(null)}
+                  />
+                )}
+
+                {block.block_type === 'superset' && block.exercises.length > 1 ? (
+                  <SupersetGroup
+                    exercises={block.exercises}
+                    onUpsertSetLog={onUpsertSetLog}
+                    onRemoveExerciseFromBlock={onRemoveExerciseFromBlock}
+                  />
+                ) : block.block_type === 'emom' && block.exercises.length > 1 ? (
+                  <EmomGroup
+                    exercises={block.exercises}
+                    onUpsertSetLog={onUpsertSetLog}
+                    onRemoveExerciseFromBlock={onRemoveExerciseFromBlock}
+                  />
+                ) : (
+                  block.exercises.map(be => (
+                    <div
+                      key={be.id}
+                      className={`exercise-item ${draggedBeId === be.id ? 'dragging' : ''}`}
+                      draggable
+                      onDragStart={() => setDraggedBeId(be.id)}
+                      onDragEnd={() => setDraggedBeId(null)}
+                    >
+                      <MovementBlock
+                        blockExercise={be}
+                        blockType={block.block_type}
+                        onUpsertSetLog={(round, payload) => onUpsertSetLog(be.id, round, payload)}
+                        onRemove={() => onRemoveExerciseFromBlock(be.id)}
+                      />
+                    </div>
+                  ))
+                )}
+
+                {block.exercises.length === 0 && (
+                  <div className="empty" style={{ padding: 14 }}>Aucun mouvement dans ce bloc.</div>
+                )}
+
+                <AddToBlockInline
+                  blockId={block.id}
+                  catalog={sortedCatalog}
+                  onAddExerciseToBlock={onAddExerciseToBlock}
                 />
-              )}
 
-              {block.block_type === 'superset' && block.exercises.length > 1 ? (
-                <SupersetGroup
-                  exercises={block.exercises}
-                  onUpsertSetLog={onUpsertSetLog}
-                  onRemoveExerciseFromBlock={onRemoveExerciseFromBlock}
-                />
-              ) : block.block_type === 'emom' && block.exercises.length > 1 ? (
-                <EmomGroup
-                  exercises={block.exercises}
-                  onUpsertSetLog={onUpsertSetLog}
-                  onRemoveExerciseFromBlock={onRemoveExerciseFromBlock}
-                />
-              ) : (
-                block.exercises.map(be => (
-                  <div
-                    key={be.id}
-                    className={`exercise-item ${draggedBeId === be.id ? 'dragging' : ''}`}
-                    draggable
-                    onDragStart={() => setDraggedBeId(be.id)}
-                    onDragEnd={() => setDraggedBeId(null)}
-                  >
-                    <MovementBlock
-                      blockExercise={be}
-                      blockType={block.block_type}
-                      onUpsertSetLog={(round, payload) => onUpsertSetLog(be.id, round, payload)}
-                      onRemove={() => onRemoveExerciseFromBlock(be.id)}
-                    />
-                  </div>
-                ))
-              )}
+                {RESULT_TYPES.has(block.block_type) && (
+                  <ResultForm block={block} onSubmit={vals => onSetBlockResult(block.id, vals)} />
+                )}
 
-              {block.exercises.length === 0 && (
-                <div className="empty" style={{ padding: 14 }}>Aucun mouvement dans ce bloc.</div>
-              )}
-
-              <AddToBlockInline
-                blockId={block.id}
-                catalog={sortedCatalog}
-                onAddExerciseToBlock={onAddExerciseToBlock}
-              />
-
-              {RESULT_TYPES.has(block.block_type) && (
-                <ResultForm block={block} onSubmit={vals => onSetBlockResult(block.id, vals)} />
-              )}
+                <BlockNotes block={block} onSave={notes => onUpdateBlock(block.id, { notes })} />
+              </div>
             </div>
           )
         })}
@@ -727,6 +909,47 @@ export default function PersonalSessionCard({
           <div className="empty">Aucun bloc dans cette séance pour l&apos;instant.</div>
         )}
       </div>
+    </div>
+  )
+}
+
+// Note libre par bloc (ressenti, douleur, sommeil...). Le champ `notes` existe
+// déjà en base sur personal_blocks et était juste sélectionné sans jamais être
+// écrit ; onSave passe par onUpdateBlock qui patch la colonne.
+function BlockNotes({ block, onSave }) {
+  const [value, setValue] = useState(block.notes || '')
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState(null)
+
+  const dirty = value !== (block.notes || '')
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave(value)
+      setSavedAt(Date.now())
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="block-notes">
+      <label className="block-notes-label">Note</label>
+      <textarea
+        className="block-notes-input"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        placeholder="Ressenti, douleur, sommeil…"
+        maxLength={2000}
+      />
+      {dirty ? (
+        <button type="button" className="block-notes-save" onClick={handleSave} disabled={saving}>
+          {saving ? '...' : 'Enregistrer la note'}
+        </button>
+      ) : savedAt ? (
+        <p className="block-notes-saved">Enregistré</p>
+      ) : null}
     </div>
   )
 }
