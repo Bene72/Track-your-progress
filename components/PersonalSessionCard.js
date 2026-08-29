@@ -38,6 +38,7 @@ export default function PersonalSessionCard({
   onSetBlockResult,
 }) {
   const [selectedExerciseId, setSelectedExerciseId] = useState('')
+  const [exerciseQuery, setExerciseQuery] = useState('')
   const [selectedBlockId, setSelectedBlockId] = useState('') // '' = nouveau bloc
   const [newBlockType, setNewBlockType] = useState('straight_sets')
   const [newBlockRounds, setNewBlockRounds] = useState('4')
@@ -79,6 +80,7 @@ export default function PersonalSessionCard({
 
   const resetAddForm = () => {
     setSelectedExerciseId('')
+    setExerciseQuery('')
     setTargetReps('')
     setTargetWeight('')
     setTargetDistance('')
@@ -136,6 +138,21 @@ export default function PersonalSessionCard({
       setError(err.message)
       return null
     }
+  }
+
+  // Bouton "Ajouter" du formulaire principal : si aucun exercice existant
+  // n'est sélectionné mais qu'un texte libre a été tapé, on le crée d'abord
+  // (groupe musculaire générique par défaut) puis on l'ajoute. Ça marche en
+  // un seul clic, sans avoir besoin d'ouvrir/cliquer la liste déroulante.
+  const handlePrimaryAdd = async () => {
+    if (selectedExerciseId) {
+      await handleAddExercise(selectedExerciseId)
+      return
+    }
+    const name = exerciseQuery.trim()
+    if (!name) return
+    const created = await handleCreateExercise(name)
+    if (created) await handleAddExercise(created.id)
   }
 
   const handleDrop = async (targetBlockId) => {
