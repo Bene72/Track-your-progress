@@ -254,6 +254,7 @@ export default function PersonalSessionCard({
 
         .exercise-select, .custom-input, .custom-select, .block-select, .type-select {
           width: 100%;
+          min-width: 0;
           box-sizing: border-box;
           min-height: 42px;
           padding: 0 12px;
@@ -265,6 +266,12 @@ export default function PersonalSessionCard({
           font-size: 13px;
           outline: none;
           transition: .18s ease;
+        }
+
+        .block-select, .type-select {
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          overflow: hidden;
         }
 
         .exercise-select:focus, .custom-input:focus, .custom-select:focus,
@@ -280,10 +287,14 @@ export default function PersonalSessionCard({
         }
         .row-2 { grid-template-columns: 1fr 1fr; }
         .row-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .row-2 > div, .row-3 > div { min-width: 0; }
 
+        /* Reps/Poids n'ont jamais besoin de beaucoup de place (2-4 chiffres) :
+           on leur laisse une colonne plus étroite et on donne l'espace gagné
+           à Distance, pour que la ligne complète tienne sans déborder sur mobile. */
         .target-fields {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: 0.8fr 0.8fr 1.2fr;
           gap: 8px;
           margin-top: 9px;
         }
@@ -291,8 +302,9 @@ export default function PersonalSessionCard({
         .mini-input {
           box-sizing: border-box;
           width: 100%;
+          min-width: 0;
           min-height: 38px;
-          padding: 0 10px;
+          padding: 0 8px;
           border: 1px solid var(--psc-border);
           border-radius: 9px;
           color: white;
@@ -534,7 +546,6 @@ export default function PersonalSessionCard({
         @media (max-width: 520px) {
           .psc-card { padding: 15px; border-radius: 18px; }
           .action-row, .row-2, .row-3 { grid-template-columns: 1fr; }
-          .target-fields { grid-template-columns: 1fr 1fr; }
         }
       `}</style>
 
