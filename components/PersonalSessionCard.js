@@ -53,6 +53,7 @@ export default function PersonalSessionCard({
   const [customName, setCustomName] = useState('')
   const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS[0].value)
   const [error, setError] = useState(null)
+  const [addingExercise, setAddingExercise] = useState(false)
   const [draggedBeId, setDraggedBeId] = useState(null)
   const [dragOverBlockId, setDragOverBlockId] = useState(null)
   const [editingBlockId, setEditingBlockId] = useState(null)
@@ -76,6 +77,7 @@ export default function PersonalSessionCard({
   }, [session.created_at])
 
   const blocks = session.blocks || []
+  const totalExercises = blocks.reduce((sum, b) => sum + (b.exercises?.length || 0), 0)
   const isNewBlockMode = selectedBlockId === ''
   const sortedCatalog = Object.values(catalogByMuscle).flat().sort((a, b) => a.name.localeCompare(b.name, 'fr'))
   const [pickerResetKey, setPickerResetKey] = useState(0)
@@ -90,8 +92,9 @@ export default function PersonalSessionCard({
   }
 
   const handleAddExercise = async (exerciseId) => {
-    if (!exerciseId) return
+    if (!exerciseId || addingExercise) return
     setError(null)
+    setAddingExercise(true)
     const opts = {
       targetReps: targetReps ? Number(targetReps) : null,
       targetWeightKg: targetWeight ? Number(targetWeight) : null,
@@ -111,6 +114,8 @@ export default function PersonalSessionCard({
       resetAddForm()
     } catch (err) {
       setError(err.message)
+    } finally {
+      setAddingExercise(false)
     }
   }
 
@@ -147,14 +152,23 @@ export default function PersonalSessionCard({
   // (groupe musculaire générique par défaut) puis on l'ajoute. Ça marche en
   // un seul clic, sans avoir besoin d'ouvrir/cliquer la liste déroulante.
   const handlePrimaryAdd = async () => {
+    if (addingExercise) return
     if (selectedExerciseId) {
       await handleAddExercise(selectedExerciseId)
       return
     }
     const name = exerciseQuery.trim()
     if (!name) return
-    const created = await handleCreateExercise(name)
-    if (created) await handleAddExercise(created.id)
+    setAddingExercise(true)
+    try {
+      const created = await handleCreateExercise(name)
+      if (!created) return
+      // handleAddExercise gère elle-même la suite du cycle addingExercise.
+      setAddingExercise(false)
+      await handleAddExercise(created.id)
+    } finally {
+      setAddingExercise(false)
+    }
   }
 
   const handleDrop = async (targetBlockId) => {
@@ -187,11 +201,15 @@ export default function PersonalSessionCard({
           --psc-accent: var(--rx, #F97316);
           --psc-border: rgba(255,255,255,.09);
           --psc-muted: rgba(255,255,255,.52);
+          max-width: 100%;
+          box-sizing: border-box;
           padding: 20px;
           border: 1px solid var(--psc-border);
           border-radius: 22px;
           background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.025));
           box-shadow: 0 14px 38px rgba(0,0,0,.14);
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
         }
 
         .psc-head {
@@ -226,6 +244,13 @@ export default function PersonalSessionCard({
         }
 
         .psc-name { margin: 0; font-size: 15px; font-weight: 850; }
+
+        .psc-count {
+          margin: 3px 0 0;
+          color: var(--psc-muted);
+          font-size: 10.5px;
+          font-weight: 700;
+        }
 
         .psc-time {
           padding: 5px 8px;
@@ -462,6 +487,9 @@ export default function PersonalSessionCard({
           background: rgba(0,0,0,.18);
         }
 
+        .presc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+        .presc-head .presc-rule { flex: 1; min-width: 0; }
+        .presc-count { flex: 0 0 auto; color: rgba(255,255,255,.4); font-size: 9.5px; font-weight: 700; white-space: nowrap; }
         .presc-rule { margin: 0 0 4px; font-size: 12px; font-weight: 850; color: white; }
 
         .presc-move {
@@ -555,6 +583,9 @@ export default function PersonalSessionCard({
           <div>
             <p className="psc-kicker">Session</p>
             <p className="psc-name">Entraînement personnel</p>
+            <p className="psc-count">
+              {blocks.length} bloc{blocks.length !== 1 ? 's' : ''} · {totalExercises} exercice{totalExercises !== 1 ? 's' : ''}
+            </p>
           </div>
         </div>
         {timeLabel && <span className="psc-time">{timeLabel}</span>}
@@ -639,9 +670,9 @@ export default function PersonalSessionCard({
             type="button"
             className="action primary"
             onClick={handlePrimaryAdd}
-            disabled={!selectedExerciseId && !exerciseQuery.trim()}
+            disabled={addingExercise || (!selectedExerciseId && !exerciseQuery.trim())}
           >
-            {!selectedExerciseId && exerciseQuery.trim() ? `＋ Créer et ajouter` : 'Ajouter'}
+            {addingExercise ? 'Ajout…' : (!selectedExerciseId && exerciseQuery.trim() ? '＋ Créer et ajouter' : 'Ajouter')}
           </button>
         </div>
 
@@ -678,7 +709,19 @@ export default function PersonalSessionCard({
               onDrop={e => { e.preventDefault(); handleDrop(block.id) }}
             >
               <div className="block-header">
-                <div className="block-title" onClick={() => toggleBlockOpen(block.id)}>
+                <div
+                  className="block-title"
+                  onClick={() => toggleBlockOpen(block.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      toggleBlockOpen(block.id)
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isOpen}
+                >
                   <span className="block-letter">{blockLetter(blockIdx)}/</span>
                   <span className="block-title-text">
                     {block.exercises.map(e => e.exercise?.name).join(' + ') || 'Bloc vide'}
@@ -701,7 +744,12 @@ export default function PersonalSessionCard({
               </div>
 
               <div className="block-prescription">
-                <p className="presc-rule">{prescriptionLine(block)}</p>
+                <div className="presc-head">
+                  <p className="presc-rule">{prescriptionLine(block)}</p>
+                  <span className="presc-count">
+                    {block.exercises.length} mouvement{block.exercises.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
                 {block.exercises.map(be => {
                   const { main, tail } = movementTargetLine(be)
                   return (
