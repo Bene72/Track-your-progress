@@ -63,23 +63,22 @@ export async function middleware(request) {
   let response = NextResponse.next({ request: { headers: requestHeaders } })
   Object.entries(SECURITY_HEADERS).forEach(([k, v]) => response.headers.set(k, v))
 
+  // API getAll/setAll (get/set/remove est déprécié par @supabase/ssr).
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
-        get(name) { return request.cookies.get(name)?.value },
-        set(name, value, options) {
-          request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({ request: { headers: requestHeaders } })
-          Object.entries(SECURITY_HEADERS).forEach(([k, v]) => response.headers.set(k, v))
-          response.cookies.set({ name, value, ...options })
+        getAll() {
+          return request.cookies.getAll()
         },
-        remove(name, options) {
-          request.cookies.set({ name, value: '', ...options })
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({ request: { headers: requestHeaders } })
           Object.entries(SECURITY_HEADERS).forEach(([k, v]) => response.headers.set(k, v))
-          response.cookies.set({ name, value: '', ...options })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
         },
       },
     }
