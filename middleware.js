@@ -37,10 +37,18 @@ function buildSecurityHeaders(nonce) {
 
 const PUBLIC_PATHS = ['/auth']
 const STATIC_REGEX = /\.(svg|png|jpg|jpeg|gif|webp|ico|woff2?)$/
+// Les routes API (ex: /api/cron) gèrent leur propre authentification
+// (ex: vérification CRON_SECRET dans route.js) et doivent répondre en
+// JSON, jamais par une redirection HTML vers /auth. Sans cette exception,
+// le garde-fou "user session" ci-dessous interceptait CES requêtes AVANT
+// que route.js ait la moindre chance de vérifier le header Authorization
+// — la vérif CRON_SECRET n'était donc jamais atteinte.
+const API_PREFIX = '/api/'
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl
   if (STATIC_REGEX.test(pathname)) return NextResponse.next()
+  const isApiRoute = pathname.startsWith(API_PREFIX)
 
   // Nonce unique par requête. Next.js le détecte automatiquement dans le
   // header CSP de la requête entrante et l'applique lui-même à ses
@@ -79,6 +87,11 @@ export async function middleware(request) {
 
   const { data: { user } } = await supabase.auth.getUser()
   const isPublic = PUBLIC_PATHS.some(p => pathname.startsWith(p))
+
+  // Routes API : pas de redirection HTML. On garde les headers de
+  // sécurité (déjà posés sur `response` ci-dessus) et on laisse chaque
+  // route gérer son propre 401/403 en JSON.
+  if (isApiRoute) return response
 
   if (!user && !isPublic) {
     const redirectUrl = new URL('/auth', request.url)
