@@ -16,6 +16,7 @@ import {
 import ExerciseAutocomplete from './personal-session/ExerciseAutocomplete'
 import {
   BlockComment,
+  SessionNotes,
   AddToBlockInline,
   BlockSettingsForm,
   ResultForm,
@@ -36,6 +37,7 @@ export default function PersonalSessionCard({
   onAddCustomExercise,
   onUpsertSetLog,
   onSetBlockResult,
+  onUpdateSessionNotes,
 }) {
   const [selectedExerciseId, setSelectedExerciseId] = useState('')
   const [exerciseQuery, setExerciseQuery] = useState('')
@@ -547,6 +549,8 @@ export default function PersonalSessionCard({
         {timeLabel && <span className="psc-time">{timeLabel}</span>}
       </div>
 
+      <SessionNotes session={session} onSave={notes => onUpdateSessionNotes(session.id, notes)} />
+
       <div className="add-area">
         <label className="label">Exercice</label>
         <ExerciseAutocomplete
@@ -555,6 +559,7 @@ export default function PersonalSessionCard({
           value={selectedExerciseId}
           onChange={setSelectedExerciseId}
           onCreateNew={handleCreateExercise}
+          onQueryChange={setExerciseQuery}
         />
 
         <label className="label" style={{ marginTop: 10 }}>Destination</label>
@@ -622,10 +627,10 @@ export default function PersonalSessionCard({
           <button
             type="button"
             className="action primary"
-            onClick={() => handleAddExercise(selectedExerciseId)}
-            disabled={!selectedExerciseId}
+            onClick={handlePrimaryAdd}
+            disabled={!selectedExerciseId && !exerciseQuery.trim()}
           >
-            Ajouter
+            {!selectedExerciseId && exerciseQuery.trim() ? `＋ Créer et ajouter` : 'Ajouter'}
           </button>
         </div>
 
