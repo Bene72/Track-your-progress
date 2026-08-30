@@ -407,6 +407,7 @@ export default function PersonalTrainingPage() {
                     onAddCustomExercise={pt.addCustomExercise}
                     onUpsertSetLog={pt.upsertSetLog}
                     onSetBlockResult={pt.setBlockResult}
+                    onUpdateSessionNotes={pt.updateSessionNotes}
                   />
                 </div>
               ))}
