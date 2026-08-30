@@ -57,10 +57,10 @@ export default function PersonalSessionCard({
   const [draggedBeId, setDraggedBeId] = useState(null)
   const [dragOverBlockId, setDragOverBlockId] = useState(null)
   const [editingBlockId, setEditingBlockId] = useState(null)
-  const [closedBlockIds, setClosedBlockIds] = useState(() => new Set())
+  const [openBlockIds, setOpenBlockIds] = useState(() => new Set())
 
   const toggleBlockOpen = (blockId) => {
-    setClosedBlockIds(prev => {
+    setOpenBlockIds(prev => {
       const next = new Set(prev)
       if (next.has(blockId)) next.delete(blockId)
       else next.add(blockId)
@@ -108,8 +108,10 @@ export default function PersonalSessionCard({
           timeCapSec: newBlockType === 'amrap' || newBlockType === 'for_time' ? Number(newBlockTimeCap) || null : null,
         })
         await onAddExerciseToBlock(block.id, exerciseId, opts)
+        setOpenBlockIds(prev => new Set(prev).add(block.id))
       } else {
         await onAddExerciseToBlock(selectedBlockId, exerciseId, opts)
+        setOpenBlockIds(prev => new Set(prev).add(selectedBlockId))
       }
       resetAddForm()
     } catch (err) {
@@ -700,7 +702,7 @@ export default function PersonalSessionCard({
       <div className="block-list">
         {blocks.map((block, blockIdx) => {
           const isMulti = block.exercises.length > 1
-          const isOpen = !closedBlockIds.has(block.id)
+          const isOpen = openBlockIds.has(block.id)
           return (
             <div
               key={block.id}
