@@ -422,6 +422,7 @@ export default function PersonalSessionCard({
           display: flex;
           align-items: center;
           justify-content: space-between;
+          flex-wrap: wrap;
           gap: 8px;
           padding: 2px 4px 8px;
         }
@@ -464,6 +465,7 @@ export default function PersonalSessionCard({
           font-weight: 800;
           letter-spacing: .04em;
           text-transform: uppercase;
+          white-space: nowrap;
         }
 
         .block-chevron {
@@ -477,7 +479,7 @@ export default function PersonalSessionCard({
 
         .block-sub { color: rgba(255,255,255,.4); font-size: 9px; font-weight: 600; text-transform: none; letter-spacing: 0; }
 
-        .block-header-actions { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
+        .block-header-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 
         .block-prescription {
           margin: 2px 4px 10px;
@@ -506,26 +508,25 @@ export default function PersonalSessionCard({
         .block-body { overflow: hidden; }
         .block-body.closed { display: none; }
 
-        .block-edit {
-          border: 0;
-          color: rgba(255,255,255,.35);
-          background: transparent;
-          font: inherit;
-          font-size: 11px;
+        .icon-btn {
+          flex: 0 0 auto;
+          display: grid;
+          place-items: center;
+          width: 30px;
+          height: 30px;
+          border: 1px solid var(--psc-border);
+          border-radius: 9px;
+          color: rgba(255,255,255,.55);
+          background: rgba(255,255,255,.03);
+          font-size: 13px;
+          line-height: 1;
           cursor: pointer;
+          transition: .18s ease;
         }
-        .block-edit:hover { color: #FDBA74; }
+        .icon-btn:hover { color: white; background: rgba(255,255,255,.08); }
+        .icon-btn.danger:hover { color: #ff8d8d; background: rgba(255,92,92,.1); border-color: rgba(255,92,92,.3); }
 
-        .block-delete {
-          border: 0;
-          color: rgba(255,255,255,.35);
-          background: transparent;
-          font: inherit;
-          font-size: 11px;
-          cursor: pointer;
-        }
-        .block-delete:hover { color: #ff8d8d; }
-
+        
         .exercise-item {
           padding: 8px 10px;
           margin-bottom: 4px;
@@ -726,19 +727,29 @@ export default function PersonalSessionCard({
                   <span className="block-title-text">
                     {block.exercises.map(e => e.exercise?.name).join(' + ') || 'Bloc vide'}
                   </span>
-                  <span className="block-tag">{BLOCK_TYPE_ICON[block.block_type]} {BLOCK_TYPE_LABEL[block.block_type]}</span>
+                  <span className="block-tag" title={BLOCK_TYPE_LABEL[block.block_type]}>
+                    {BLOCK_TYPE_ICON[block.block_type]}
+                  </span>
                   <span className={`block-chevron ${isOpen ? 'open' : ''}`}>›</span>
                 </div>
                 <div className="block-header-actions">
                   <button
                     type="button"
-                    className="block-edit"
+                    className="icon-btn"
                     onClick={() => setEditingBlockId(cur => (cur === block.id ? null : block.id))}
+                    aria-label={editingBlockId === block.id ? 'Fermer les réglages du bloc' : 'Modifier le bloc'}
+                    title={editingBlockId === block.id ? 'Fermer' : 'Modifier'}
                   >
-                    {editingBlockId === block.id ? 'Fermer' : 'Modifier'}
+                    {editingBlockId === block.id ? '✕' : '✎'}
                   </button>
-                  <button type="button" className="block-delete" onClick={() => onDeleteBlock(block.id)}>
-                    Supprimer le bloc
+                  <button
+                    type="button"
+                    className="icon-btn danger"
+                    onClick={() => onDeleteBlock(block.id)}
+                    aria-label="Supprimer le bloc"
+                    title="Supprimer le bloc"
+                  >
+                    🗑
                   </button>
                 </div>
               </div>
