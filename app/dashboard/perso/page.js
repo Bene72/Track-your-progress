@@ -34,6 +34,14 @@ function addDaysStr(dateStr, days) {
   return `${yyyy}-${mm}-${dd}`
 }
 
+function todayDateStr() {
+  const d = new Date()
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
 export default function PersonalTrainingPage() {
   const { userId } = useCurrentUser({ redirectIfNull: true })
   const pt = usePersonalTraining(userId)
@@ -51,6 +59,8 @@ export default function PersonalTrainingPage() {
   }
 
   const dateLabel = formatDateFrLong(pt.viewDate)
+  const todayStr = todayDateStr()
+  const isToday = pt.viewDate === todayStr
 
   const handleDeleteSession = async (sessionId) => {
     if (!window.confirm('Supprimer cette séance ? Cette action est irréversible.')) return
@@ -84,6 +94,7 @@ export default function PersonalTrainingPage() {
           max-width: 900px;
           margin: 0 auto;
           padding-bottom: 40px;
+          overflow-x: hidden;
         }
 
         .personal-hero {
@@ -205,7 +216,7 @@ export default function PersonalTrainingPage() {
           transform: translateY(-1px);
         }
 
-        .date-center { flex: 1; text-align: center; }
+        .date-center { flex: 1; min-width: 0; text-align: center; }
 
         .date-label {
           margin-bottom: 5px;
@@ -215,6 +226,7 @@ export default function PersonalTrainingPage() {
         }
 
         .date-input {
+          max-width: 100%;
           color: var(--p-muted);
           border: 0;
           background: transparent;
@@ -222,6 +234,24 @@ export default function PersonalTrainingPage() {
           font-size: 11px;
           cursor: pointer;
         }
+
+        .today-btn {
+          flex: 0 0 auto;
+          min-height: 40px;
+          padding: 0 12px;
+          border: 1px solid rgba(249,115,22,.3);
+          border-radius: 12px;
+          color: #FDBA74;
+          background: rgba(249,115,22,.08);
+          font: inherit;
+          font-size: 11px;
+          font-weight: 800;
+          white-space: nowrap;
+          cursor: pointer;
+          transition: .18s ease;
+        }
+        .today-btn:hover:not(:disabled) { background: rgba(249,115,22,.16); }
+        .today-btn:disabled { opacity: .45; cursor: default; }
 
         .sessions {
           display: grid;
@@ -372,6 +402,16 @@ export default function PersonalTrainingPage() {
                   aria-label="Choisir une date"
                 />
               </div>
+
+              {!isToday && (
+                <button
+                  type="button"
+                  className="today-btn"
+                  onClick={() => pt.changeDate(todayStr)}
+                >
+                  Aujourd&apos;hui
+                </button>
+              )}
 
               <button
                 type="button"
