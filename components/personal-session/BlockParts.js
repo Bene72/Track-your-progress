@@ -56,9 +56,68 @@ export function BlockComment({ block, onSave }) {
   )
 }
 
+// Notes libres pour l'ensemble de la séance (ressenti général, contexte du
+// jour, sommeil, motivation...) — distinct du Commentaire par bloc, qui porte
+// sur l'exécution d'un bloc précis (consignes, pace...). Nécessite une
+// colonne `notes` (text, nullable) sur la table `personal_sessions`.
+export function SessionNotes({ session, onSave }) {
+  const [value, setValue] = useState(session.notes || '')
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState(null)
+
+  const dirty = value !== (session.notes || '')
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave(value)
+      setSavedAt(Date.now())
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="session-notes">
+      <style jsx>{`
+        .session-notes { padding: 14px; margin-bottom: 14px; border: 1px solid var(--psc-border); border-radius: 16px; background: rgba(255,255,255,.03); }
+        .session-notes-head { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+        .session-notes-icon { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; color: #FDBA74; background: rgba(249,115,22,.13); font-size: 13px; flex: 0 0 auto; }
+        .session-notes-label { margin: 0; color: rgba(255,255,255,.8); font-size: 12px; font-weight: 800; }
+        .session-notes-input { width: 100%; box-sizing: border-box; min-height: 70px; padding: 10px 12px; border: 1px solid var(--psc-border); border-radius: 11px; color: white; background: rgba(255,255,255,.04); font: inherit; font-size: 13px; line-height: 1.55; resize: vertical; outline: none; transition: .18s ease; }
+        .session-notes-input:focus { border-color: rgba(249,115,22,.65); box-shadow: 0 0 0 3px rgba(249,115,22,.09); }
+        .session-notes-input::placeholder { color: rgba(255,255,255,.28); }
+        .session-notes-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+        .session-notes-status { color: rgba(255,255,255,.35); font-size: 11px; }
+        .session-notes-save { min-height: 34px; padding: 0 14px; border: 0; border-radius: 9px; color: white; background: linear-gradient(135deg, #F97316, #C2410C); font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; box-shadow: 0 7px 18px rgba(249,115,22,.18); transition: .18s ease; }
+        .session-notes-save:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(249,115,22,.27); }
+        .session-notes-save:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; transform: none; }
+      `}</style>
+      <div className="session-notes-head">
+        <span className="session-notes-icon">🗒</span>
+        <p className="session-notes-label">Notes de la séance</p>
+      </div>
+      <textarea
+        className="session-notes-input"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        placeholder="Ressenti général, contexte du jour, sommeil, motivation…"
+        maxLength={4000}
+      />
+      <div className="session-notes-footer">
+        {!dirty && savedAt && <span className="session-notes-status">Enregistré</span>}
+        <button type="button" className="session-notes-save" onClick={handleSave} disabled={!dirty || saving}>
+          {saving ? '...' : 'Enregistrer'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function AddToBlockInline({ blockId, catalog, onAddExerciseToBlock, onAddCustomExercise }) {
   const [open, setOpen] = useState(false)
   const [exerciseId, setExerciseId] = useState('')
+  const [exerciseQuery, setExerciseQuery] = useState('')
   const [reps, setReps] = useState('')
   const [weight, setWeight] = useState('')
   const [distance, setDistance] = useState('')
@@ -76,16 +135,24 @@ export function AddToBlockInline({ blockId, catalog, onAddExerciseToBlock, onAdd
   }
 
   const handleAdd = async () => {
-    if (!exerciseId) return
     setSaving(true)
     setError(null)
     try {
-      await onAddExerciseToBlock(blockId, exerciseId, {
+      let id = exerciseId
+      if (!id) {
+        const name = exerciseQuery.trim()
+        if (!name) return
+        const created = await handleCreateExercise(name)
+        if (!created) return
+        id = created.id
+      }
+      await onAddExerciseToBlock(blockId, id, {
         targetReps: reps ? Number(reps) : null,
         targetWeightKg: weight ? Number(weight) : null,
         targetDistanceM: distance ? Number(distance) : null,
       })
       setExerciseId('')
+      setExerciseQuery('')
       setReps('')
       setWeight('')
       setDistance('')
@@ -128,6 +195,7 @@ export function AddToBlockInline({ blockId, catalog, onAddExerciseToBlock, onAdd
             value={exerciseId}
             onChange={setExerciseId}
             onCreateNew={handleCreateExercise}
+            onQueryChange={setExerciseQuery}
           />
           <div className="add-to-block-targets">
             <input className="field-input" type="number" placeholder="Reps" value={reps}
@@ -140,8 +208,8 @@ export function AddToBlockInline({ blockId, catalog, onAddExerciseToBlock, onAdd
           {error && <div className="add-to-block-error">{error}</div>}
           <div className="add-to-block-actions">
             <button type="button" className="btn-cancel" onClick={() => setOpen(false)}>Annuler</button>
-            <button type="button" className="btn-primary" onClick={handleAdd} disabled={!exerciseId || saving}>
-              {saving ? '...' : 'Ajouter'}
+            <button type="button" className="btn-primary" onClick={handleAdd} disabled={(!exerciseId && !exerciseQuery.trim()) || saving}>
+              {saving ? '...' : (!exerciseId && exerciseQuery.trim() ? 'Créer et ajouter' : 'Ajouter')}
             </button>
           </div>
         </div>
@@ -748,4 +816,4 @@ function EmomSimpleRow({ exercise, onUpsertSetLog, onRemove }) {
       )}
     </div>
   )
-}  
+}
