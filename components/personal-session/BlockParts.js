@@ -171,9 +171,11 @@ export function AddToBlockInline({ blockId, catalog, onAddExerciseToBlock, onAdd
         .add-to-block-toggle { width: 100%; min-height: 34px; border: 1px dashed rgba(255,255,255,.16); border-radius: 9px; color: rgba(255,255,255,.55); background: transparent; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; transition: .18s ease; }
         .add-to-block-toggle:hover { border-color: rgba(249,115,22,.5); color: #FDBA74; background: rgba(249,115,22,.06); }
         .add-to-block-form { padding: 10px; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; background: rgba(255,255,255,.025); display: grid; gap: 8px; }
-        .field-input { width: 100%; box-sizing: border-box; min-height: 32px; padding: 0 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: white; background: rgba(255,255,255,.035); font: inherit; font-size: 11px; outline: none; }
+        .field-input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 32px; padding: 0 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: white; background: rgba(255,255,255,.035); font: inherit; font-size: 11px; outline: none; }
         .field-input:focus { border-color: rgba(249,115,22,.65); box-shadow: 0 0 0 3px rgba(249,115,22,.09); }
-        .add-to-block-targets { display: flex; gap: 6px; }
+        .add-to-block-targets { display: flex; gap: 6px; flex-wrap: wrap; }
+        .add-to-block-targets .field-narrow { flex: 1 1 64px; }
+        .add-to-block-targets .field-wide { flex: 2 1 90px; }
         .add-to-block-actions { display: flex; gap: 8px; }
         .add-to-block-actions button { flex: 1; min-height: 32px; border-radius: 8px; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; border: 1px solid transparent; }
         .btn-cancel { color: rgba(255,255,255,.5); background: transparent; border-color: rgba(255,255,255,.12) !important; }
@@ -198,11 +200,11 @@ export function AddToBlockInline({ blockId, catalog, onAddExerciseToBlock, onAdd
             onQueryChange={setExerciseQuery}
           />
           <div className="add-to-block-targets">
-            <input className="field-input" type="number" placeholder="Reps" value={reps}
+            <input className="field-input field-narrow" type="number" placeholder="Reps" value={reps}
               onChange={e => setReps(e.target.value)} inputMode="numeric" />
-            <input className="field-input" type="number" placeholder="kg" value={weight}
+            <input className="field-input field-narrow" type="number" placeholder="kg" value={weight}
               onChange={e => setWeight(e.target.value)} inputMode="decimal" step="0.5" />
-            <input className="field-input" type="number" placeholder="m" value={distance}
+            <input className="field-input field-wide" type="number" placeholder="m" value={distance}
               onChange={e => setDistance(e.target.value)} inputMode="numeric" />
           </div>
           {error && <div className="add-to-block-error">{error}</div>}
@@ -375,11 +377,11 @@ export function EditableSetRow({ log, onUpsertSetLog }) {
       ) : (
         <div className="set-row-edit">
           <div className="input-row">
-            <div className="input-group">
+            <div className="input-group" style={{ flex: 0.6, minWidth: 46 }}>
               <label className="field-label">Reps</label>
               <input className="field-input" type="number" min="0" value={reps} onChange={e => setReps(e.target.value)} inputMode="numeric" />
             </div>
-            <div className="input-group">
+            <div className="input-group" style={{ flex: 0.6, minWidth: 46 }}>
               <label className="field-label">Poids</label>
               <input className="field-input" type="number" min="0" step="0.5" value={weight} onChange={e => setWeight(e.target.value)} placeholder="kg" inputMode="decimal" />
             </div>
@@ -473,12 +475,12 @@ export function MovementBlock({ blockExercise, blockType, onUpsertSetLog, onRemo
 
       {blockType !== 'amrap' && (
         <div className="input-row">
-          <div className="input-group">
+          <div className="input-group" style={{ flex: 0.6, minWidth: 46 }}>
             <label className="field-label">Reps</label>
             <input className="field-input" type="number" min="0" value={reps}
               onChange={e => setReps(e.target.value)} inputMode="numeric" />
           </div>
-          <div className="input-group">
+          <div className="input-group" style={{ flex: 0.6, minWidth: 46 }}>
             <label className="field-label">Poids</label>
             <input className="field-input" type="number" min="0" step="0.5" value={weight}
               onChange={e => setWeight(e.target.value)} placeholder="kg" inputMode="decimal" />
@@ -553,8 +555,9 @@ export function SupersetRoundRow({ round, exercises, onUpsertSetLog }) {
         .round-edit-ex { margin-bottom: 6px; }
         .round-edit-ex:last-of-type { margin-bottom: 0; }
         .round-edit-ex-name { display: block; margin-bottom: 4px; color: rgba(255,255,255,.55); font-size: 9px; font-weight: 700; }
-        .round-edit-inputs { display: flex; gap: 6px; }
-        .round-edit-inputs input { flex: 1; min-width: 0; box-sizing: border-box; min-height: 30px; padding: 0 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: white; background: rgba(255,255,255,.035); font: inherit; font-size: 11px; outline: none; }
+        .round-edit-inputs { display: flex; gap: 6px; flex-wrap: wrap; }
+        .round-edit-inputs input { flex: 1 1 60px; min-width: 0; box-sizing: border-box; min-height: 30px; padding: 0 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 7px; color: white; background: rgba(255,255,255,.035); font: inherit; font-size: 11px; outline: none; }
+        .round-edit-inputs input.wide { flex: 1.4 1 80px; }
         .round-edit-inputs input:focus { border-color: rgba(249,115,22,.65); box-shadow: 0 0 0 3px rgba(249,115,22,.09); }
         .round-edit-actions { display: flex; gap: 8px; margin-top: 8px; }
         .round-edit-actions button { flex: 1; min-height: 30px; border-radius: 7px; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; border: 1px solid transparent; }
@@ -594,7 +597,7 @@ export function SupersetRoundRow({ round, exercises, onUpsertSetLog }) {
                   onChange={ev => updateInput(i, 'reps', ev.target.value)} inputMode="numeric" />
                 <input type="number" min="0" step="0.5" placeholder="kg" value={inputs[i].weight}
                   onChange={ev => updateInput(i, 'weight', ev.target.value)} inputMode="decimal" />
-                <input type="number" min="0" placeholder="m" value={inputs[i].distance}
+                <input type="number" min="0" placeholder="m" className="wide" value={inputs[i].distance}
                   onChange={ev => updateInput(i, 'distance', ev.target.value)} inputMode="numeric" />
               </div>
             </div>
@@ -691,17 +694,17 @@ export function SupersetGroup({ exercises, onUpsertSetLog, onRemoveExerciseFromB
               <button type="button" onClick={() => onRemoveExerciseFromBlock(e.id)}>Retirer</button>
             </div>
             <div className="superset-ex-inputs">
-              <div className="input-group">
+              <div className="input-group" style={{ flex: 0.6, minWidth: 46 }}>
                 <label className="field-label">Reps</label>
                 <input className="field-input" type="number" min="0" value={inputs[i].reps}
                   onChange={ev => updateInput(i, 'reps', ev.target.value)} inputMode="numeric" />
               </div>
-              <div className="input-group">
+              <div className="input-group" style={{ flex: 0.6, minWidth: 46 }}>
                 <label className="field-label">Poids</label>
                 <input className="field-input" type="number" min="0" step="0.5" value={inputs[i].weight}
                   onChange={ev => updateInput(i, 'weight', ev.target.value)} placeholder="kg" inputMode="decimal" />
               </div>
-              <div className="input-group">
+              <div className="input-group" style={{ flex: 1 }}>
                 <label className="field-label">Distance</label>
                 <input className="field-input" type="number" min="0" value={inputs[i].distance}
                   onChange={ev => updateInput(i, 'distance', ev.target.value)} placeholder="m" inputMode="numeric" />
@@ -795,17 +798,17 @@ function EmomSimpleRow({ exercise, onUpsertSetLog, onRemove }) {
         <>
           <span className="name">{exercise.exercise?.name}</span>
           <div className="edit-row">
-            <div className="input-group">
+            <div className="input-group" style={{ flex: 0.6, minWidth: 46 }}>
               <label className="field-label">Reps</label>
               <input className="field-input" type="number" min="0" value={reps}
                 onChange={e => setReps(e.target.value)} inputMode="numeric" />
             </div>
-            <div className="input-group">
+            <div className="input-group" style={{ flex: 0.6, minWidth: 46 }}>
               <label className="field-label">Poids</label>
               <input className="field-input" type="number" min="0" step="0.5" value={weight}
                 onChange={e => setWeight(e.target.value)} placeholder="kg" inputMode="decimal" />
             </div>
-            <div className="input-group">
+            <div className="input-group" style={{ flex: 1 }}>
               <label className="field-label">Distance</label>
               <input className="field-input" type="number" min="0" value={distance}
                 onChange={e => setDistance(e.target.value)} placeholder="m" inputMode="numeric" />
