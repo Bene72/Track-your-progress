@@ -11,7 +11,7 @@ import { normalizeText } from './helpers'
 // l'exercice à la volée (via onCreateNew, fourni par le parent) puis le
 // sélectionne directement. Ça évite de bloquer la saisie quand l'exercice
 // voulu n'est pas encore dans le catalogue (base de données).
-export default function ExerciseAutocomplete({ catalog, value, onChange, placeholder, onCreateNew }) {
+export default function ExerciseAutocomplete({ catalog, value, onChange, placeholder, onCreateNew, onQueryChange }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -41,6 +41,7 @@ export default function ExerciseAutocomplete({ catalog, value, onChange, placeho
     onChange(ex.id)
     setQuery(ex.name)
     setOpen(false)
+    onQueryChange?.('')
   }
 
   const handleInputChange = (e) => {
@@ -48,6 +49,7 @@ export default function ExerciseAutocomplete({ catalog, value, onChange, placeho
     setQuery(v)
     setOpen(true)
     if (value) onChange('')
+    onQueryChange?.(v)
   }
 
   const handleCreateNew = async () => {
