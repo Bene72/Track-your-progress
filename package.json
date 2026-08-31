@@ -14,7 +14,7 @@
     "react-dom": "^18",
     "@supabase/supabase-js": "^2.44.0",
     "@supabase/ssr": "^0.12.5",
-    "zod": "^3.23.8"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "eslint": "^8",
