@@ -1,0 +1,22 @@
+name: Security audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # tous les lundis à 6h — attrape les nouvelles CVE publiées sur
+    # des dépendances déjà installées, entre deux PR Dependabot
+    - cron: '0 6 * * 1'
+
+jobs:
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - run: npm audit --audit-level=high
