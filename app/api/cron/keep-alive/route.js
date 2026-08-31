@@ -1,18 +1,13 @@
 import { NextResponse } from 'next/server'
+import { requireCronSecret } from '@/lib/api-auth' // adapte le chemin si pas d'alias @/ configuré
 
 // Route appelée périodiquement par Vercel Cron (voir vercel.json).
 // Elle fait une requête légère à Supabase pour empêcher la mise en
 // pause automatique du projet (plan gratuit = pause après 7 jours
 // d'inactivité).
 export async function GET(request) {
-  // Sécurité : seul Vercel Cron peut déclencher cette route.
-  // Vercel envoie automatiquement ce header sur les requêtes cron.
-  // IMPORTANT : si CRON_SECRET n'est pas configuré côté env, on refuse
-  // TOUT le monde (fail-closed) plutôt que de laisser passer.
-  const authHeader = request.headers.get('authorization')
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const denied = requireCronSecret(request)
+  if (denied) return denied
 
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`, {
