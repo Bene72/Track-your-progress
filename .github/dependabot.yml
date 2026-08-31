@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+    # next et @supabase/* ne sont PAS groupées volontairement :
+    # une mise à jour de next (notamment tout ce qui touche au
+    # middleware — cf. CVE-2025-29927, bypass d'auth via header
+    # x-middleware-subrequest) doit rester visible individuellement
+    # et être revue en priorité, pas noyée dans un groupe.
