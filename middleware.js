@@ -85,7 +85,10 @@ export async function middleware(request) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const isPublic = PUBLIC_PATHS.some(p => pathname.startsWith(p))
+  // Matching exact ou sous-chemin uniquement (pathname === p ou p/...),
+  // pas un simple startsWith qui matcherait aussi /auth-anything,
+  // /authorize-xyz, etc.
+  const isPublic = PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
 
   // Routes API : pas de redirection HTML. On garde les headers de
   // sécurité (déjà posés sur `response` ci-dessus) et on laisse chaque
