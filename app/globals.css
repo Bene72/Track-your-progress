@@ -195,8 +195,15 @@ a.card:active { transform: scale(0.985); background: var(--bg-card-2); }
 .moreMenuItemActive { color: var(--accent); }
 
 .pillarRow {
-  display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px;
+  display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; width: 100%;
   background: rgba(255,255,255,0.02); border: 1px solid var(--border); text-decoration: none; color: inherit;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.pillarRowExpanded { border-radius: 12px 12px 0 0; border-bottom-color: transparent; }
+.pillarBlock { display: flex; flex-direction: column; }
+.pillarPreview {
+  margin: 4px 2px 0; padding: 10px 12px; border-radius: 0 0 12px 12px; border: 1px solid var(--border);
+  border-top: none; background: rgba(255,255,255,0.015);
 }
 .pillarIcon { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; font-size: 15px; flex: 0 0 auto; }
 .pillarIconWod { background: rgba(62,213,152,.12); }
