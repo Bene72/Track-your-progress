@@ -10,7 +10,6 @@ import { useGroupPrefs } from '../../lib/hooks/useGroupPrefs'
 import { useSessionBlocksPreview } from '../../lib/hooks/useSessionBlocksPreview'
 import { BLOCK_TYPE_ICON, blockLetter, blockSubtitle } from '../../components/personal-session/helpers'
 import { localDateKey as toLocalKey } from '../../lib/date'
-import { WOD_FORMAT_LABELS } from '../../lib/constants'
 import WodCard from '../../components/WodCard'
 import WodCreateForm from '../../components/WodCreateForm'
 import ScoreForm from '../../components/ScoreForm'
@@ -25,7 +24,7 @@ export default function DashboardHome() {
   const cal = useCalendarData(box.activeBoxId, userId)
   const { myPrograms } = useProgramsList({ userId, boxId: box.activeBoxId, isCoach: box.isCoach })
   const prefs = useGroupPrefs(userId)
-  const { todayWod, myTodayScore, getLeaderboard } = wodData
+  const { getLeaderboard } = wodData
   const [editing, setEditing] = useState(false)
   const [creatingWod, setCreatingWod] = useState(false)
   const [scores, setScores] = useState([])
@@ -34,19 +33,24 @@ export default function DashboardHome() {
   const [showGroups, setShowGroups] = useState(false)
   const [expandedItem, setExpandedItem] = useState(null)
 
-  // Contenu perso/programme du JOUR SÉLECTIONNÉ dans le bandeau semaine
-  // (le WOD ci-dessous reste volontairement lié à "aujourd'hui" seulement —
-  // c'est un flux à part, alimenté par useWodData qui ne connaît que le jour
-  // présent). Filtré par les préférences "Mes groupes". Calculé avant le
-  // "return" de chargement plus bas car useSessionBlocksPreview (un hook)
-  // en a besoin — les hooks doivent tous s'exécuter dans le même ordre à
-  // chaque rendu, jamais après un retour conditionnel.
+  // Contenu perso/programme du JOUR SÉLECTIONNÉ dans le bandeau semaine,
+  // filtré par les préférences "Mes groupes". Calculé avant le "return" de
+  // chargement plus bas car useSessionBlocksPreview (un hook) en a besoin —
+  // les hooks doivent tous s'exécuter dans le même ordre à chaque rendu,
+  // jamais après un retour conditionnel.
   const isToday = selectedKey === toLocalKey(new Date())
   const selectedSession = !isToday && prefs.isVisible('perso') ? cal.sessions.find(s => s.session_date === selectedKey) : null
   const selectedProgramDays = !isToday
     ? cal.programDays.filter(p => p.date === selectedKey && prefs.isVisible(`program:${p.programId}`))
     : []
-  const selectedWod = !isToday && prefs.isVisible('wod') ? cal.wods.find(w => w.wod_date === selectedKey) : null
+  // Le WOD "en grand" (carte + score + leaderboard) suit désormais le jour
+  // sélectionné dans le bandeau semaine, pas seulement "aujourd'hui" — on le
+  // pioche dans cal.wods/cal.myScores (déjà chargés pour tout le mois affiché,
+  // semaines à cheval incluses) plutôt que dans useWodData qui ne connaît que
+  // le jour présent.
+  const selectedWod = prefs.isVisible('wod') ? cal.wods.find(w => w.wod_date === selectedKey) : null
+  const mySelectedScore = selectedWod ? (cal.myScores.find(s => s.wod_id === selectedWod.id) || null) : null
+  const selectedDateLabel = new Date(`${selectedKey}T00:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
   const sessionPreview = useSessionBlocksPreview(expandedItem === 'perso' ? selectedSession?.id : null)
 
   // Toggle "aperçu" : un clic sur la ligne ouvre le détail SANS quitter
@@ -54,18 +58,23 @@ export default function DashboardHome() {
   // seul le bouton dédié dans l'aperçu navigue vraiment vers l'écran complet.
   const toggleExpanded = (key) => setExpandedItem(v => (v === key ? null : key))
 
+  useEffect(() => { setEditing(false) }, [selectedKey])
+
   useEffect(() => {
-    if (todayWod) {
-      getLeaderboard(todayWod.id).then(setScores)
-    }
-  }, [todayWod, myTodayScore, getLeaderboard])
+    if (!selectedWod) { setScores([]); return }
+    let cancelled = false
+    getLeaderboard(selectedWod.id).then((s) => { if (!cancelled) setScores(s) })
+    return () => { cancelled = true }
+    // mySelectedScore en dépendance pour rafraîchir juste après un envoi de score.
+  }, [selectedWod, mySelectedScore, getLeaderboard])
 
   if (box.loading || wodData.loading) {
     return <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>
   }
 
   const handleSubmitScore = async (payload) => {
-    await wodData.submitScore(wodData.todayWod.id, payload)
+    await wodData.submitScore(selectedWod.id, payload)
+    await cal.reload() // pour que cal.myScores reflète le nouveau score du jour sélectionné
     setEditing(false)
     setToast('Score enregistré 💪')
     setTimeout(() => setToast(null), 2500)
@@ -73,6 +82,7 @@ export default function DashboardHome() {
 
   const handleCreateWod = async (payload) => {
     await wodData.createWod(payload)
+    await cal.reload() // pour que le nouveau WOD apparaisse dans cal.wods (source de la carte du jour sélectionné)
     setCreatingWod(false)
     setToast(payload.status === 'published' ? 'WOD publié 💪' : 'Proposition envoyée')
     setTimeout(() => setToast(null), 2500)
@@ -99,33 +109,10 @@ export default function DashboardHome() {
           <h3 className="eyebrow" style={{ marginBottom: 8 }}>
             {new Date(`${selectedKey}T00:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' })}
           </h3>
-          {!selectedWod && !selectedSession && selectedProgramDays.length === 0 && (
-            <p className="muted">Rien de particulier ce jour-là.</p>
+          {!selectedSession && selectedProgramDays.length === 0 && (
+            <p className="muted">Rien de particulier ce jour-là côté perso/programme — le WOD éventuel s&apos;affiche plus bas.</p>
           )}
           <div className="stack" style={{ gap: 8 }}>
-            {selectedWod && (
-              <div className="pillarBlock">
-                <button type="button" className={`pillarRow ${expandedItem === 'wod' ? 'pillarRowExpanded' : ''}`} onClick={() => toggleExpanded('wod')}>
-                  <span className="pillarIcon pillarIconWod">🏋️</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13 }}>{selectedWod.title}</div>
-                    <div className="muted" style={{ fontSize: 11 }}>WOD de box — {WOD_FORMAT_LABELS[selectedWod.format]}</div>
-                  </div>
-                </button>
-                {expandedItem === 'wod' && (
-                  <div className="pillarPreview">
-                    {selectedWod.description ? (
-                      <p style={{ fontSize: 12.5, whiteSpace: 'pre-wrap' }}>{selectedWod.description}</p>
-                    ) : (
-                      <p className="muted" style={{ fontSize: 12 }}>Pas de description enregistrée.</p>
-                    )}
-                    <Link href={`/dashboard/wod/${selectedWod.id}`} className="btn btnGhost btnSm" style={{ marginTop: 8 }}>
-                      Voir le WOD →
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
             {selectedSession && (
               <div className="pillarBlock">
                 <button type="button" className={`pillarRow ${expandedItem === 'perso' ? 'pillarRowExpanded' : ''}`} onClick={() => toggleExpanded('perso')}>
@@ -202,46 +189,49 @@ export default function DashboardHome() {
       {creatingWod ? (
         <div className="card">
           <h3 className="h2" style={{ fontSize: 18, marginBottom: 12 }}>Ajouter un WOD</h3>
-          <WodCreateForm isCoach={box.isCoach} userId={userId} onSubmit={handleCreateWod} onCancel={() => setCreatingWod(false)} />
+          <WodCreateForm isCoach={box.isCoach} userId={userId} onSubmit={handleCreateWod} onCancel={() => setCreatingWod(false)} initialDate={selectedKey} />
         </div>
       ) : (
         <button className="btn btnGhost btnBlock" onClick={() => setCreatingWod(true)}>+ Ajouter un WOD</button>
       )}
 
-      {!wodData.todayWod ? (
+      {!selectedWod ? (
         !creatingWod && (
           <div className="card empty">
-            <p>Aucun WOD publié aujourd’hui.</p>
+            <p>{isToday ? 'Aucun WOD publié aujourd’hui.' : `Aucun WOD publié pour le ${selectedDateLabel}.`}</p>
+            <button type="button" className="btn btnGhost btnSm" style={{ marginTop: 10 }} onClick={() => setCreatingWod(true)}>
+              + Ajouter le WOD {isToday ? 'du jour' : `du ${selectedDateLabel}`}
+            </button>
           </div>
         )
       ) : (
         <>
-          <WodCard wod={wodData.todayWod} />
+          <WodCard wod={selectedWod} />
 
-          {wodData.myTodayScore && !editing ? (
+          {mySelectedScore && !editing ? (
             <div className="card">
               <div className="row" style={{ marginBottom: 4 }}>
                 <span className="eyebrow" style={{ color: 'var(--rx)' }}>Ton score est enregistré</span>
                 <button className="btn btnGhost btnSm" onClick={() => setEditing(true)}>Modifier</button>
               </div>
-              <Leaderboard wod={wodData.todayWod} scores={scores} currentUserId={userId} />
+              <Leaderboard wod={selectedWod} scores={scores} currentUserId={userId} />
             </div>
           ) : (
             <div className="card">
               <h3 className="h2" style={{ fontSize: 18, marginBottom: 12 }}>Note ton score</h3>
               <ScoreForm
-                wod={wodData.todayWod}
-                existingScore={wodData.myTodayScore}
+                wod={selectedWod}
+                existingScore={mySelectedScore}
                 onSubmit={handleSubmitScore}
-                onCancel={wodData.myTodayScore ? () => setEditing(false) : null}
+                onCancel={mySelectedScore ? () => setEditing(false) : null}
               />
             </div>
           )}
 
-          {!wodData.myTodayScore && scores.length > 0 && (
+          {!mySelectedScore && scores.length > 0 && (
             <div className="card">
               <h3 className="eyebrow" style={{ marginBottom: 8 }}>Déjà postés</h3>
-              <Leaderboard wod={wodData.todayWod} scores={scores} currentUserId={userId} />
+              <Leaderboard wod={selectedWod} scores={scores} currentUserId={userId} />
             </div>
           )}
         </>
