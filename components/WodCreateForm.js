@@ -6,9 +6,9 @@ import { sanitizeText, wodSchema } from '../lib/security'
 import { localDateKey } from '../lib/date'
 import VideoUploadField from './VideoUploadField'
 
-export default function WodCreateForm({ isCoach, userId, onSubmit, onCancel }) {
+export default function WodCreateForm({ isCoach, userId, onSubmit, onCancel, initialDate }) {
   const [title, setTitle] = useState(''); const [format, setFormat] = useState('for_time'); const [scoringType, setScoringType] = useState(DEFAULT_SCORING.for_time)
-  const [description, setDescription] = useState(''); const [wodDate, setWodDate] = useState(localDateKey()); const [timeCap, setTimeCap] = useState(''); const [emomInterval, setEmomInterval] = useState('60'); const [emomRounds, setEmomRounds] = useState(''); const [isBenchmark, setIsBenchmark] = useState(false); const [videoUrl, setVideoUrl] = useState(''); const [saving, setSaving] = useState(false); const [error, setError] = useState(null)
+  const [description, setDescription] = useState(''); const [wodDate, setWodDate] = useState(initialDate || localDateKey()); const [timeCap, setTimeCap] = useState(''); const [emomInterval, setEmomInterval] = useState('60'); const [emomRounds, setEmomRounds] = useState(''); const [isBenchmark, setIsBenchmark] = useState(false); const [videoUrl, setVideoUrl] = useState(''); const [saving, setSaving] = useState(false); const [error, setError] = useState(null)
   function changeFormat(nextFormat) { setFormat(nextFormat); setScoringType(DEFAULT_SCORING[nextFormat]) }
   async function handleSubmit(event) {
     event.preventDefault(); setError(null)
