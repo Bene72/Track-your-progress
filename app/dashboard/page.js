@@ -7,6 +7,8 @@ import { useWodData } from '../../lib/hooks/useWodData'
 import { useCalendarData } from '../../lib/hooks/useCalendarData'
 import { useProgramsList } from '../../lib/hooks/usePrograms'
 import { useGroupPrefs } from '../../lib/hooks/useGroupPrefs'
+import { useSessionBlocksPreview } from '../../lib/hooks/useSessionBlocksPreview'
+import { BLOCK_TYPE_ICON, blockLetter, blockSubtitle } from '../../components/personal-session/helpers'
 import { localDateKey as toLocalKey } from '../../lib/date'
 import { WOD_FORMAT_LABELS } from '../../lib/constants'
 import WodCard from '../../components/WodCard'
@@ -30,6 +32,27 @@ export default function DashboardHome() {
   const [toast, setToast] = useState(null)
   const [selectedKey, setSelectedKey] = useState(() => toLocalKey(new Date()))
   const [showGroups, setShowGroups] = useState(false)
+  const [expandedItem, setExpandedItem] = useState(null)
+
+  // Contenu perso/programme du JOUR SÉLECTIONNÉ dans le bandeau semaine
+  // (le WOD ci-dessous reste volontairement lié à "aujourd'hui" seulement —
+  // c'est un flux à part, alimenté par useWodData qui ne connaît que le jour
+  // présent). Filtré par les préférences "Mes groupes". Calculé avant le
+  // "return" de chargement plus bas car useSessionBlocksPreview (un hook)
+  // en a besoin — les hooks doivent tous s'exécuter dans le même ordre à
+  // chaque rendu, jamais après un retour conditionnel.
+  const isToday = selectedKey === toLocalKey(new Date())
+  const selectedSession = !isToday && prefs.isVisible('perso') ? cal.sessions.find(s => s.session_date === selectedKey) : null
+  const selectedProgramDays = !isToday
+    ? cal.programDays.filter(p => p.date === selectedKey && prefs.isVisible(`program:${p.programId}`))
+    : []
+  const selectedWod = !isToday && prefs.isVisible('wod') ? cal.wods.find(w => w.wod_date === selectedKey) : null
+  const sessionPreview = useSessionBlocksPreview(expandedItem === 'perso' ? selectedSession?.id : null)
+
+  // Toggle "aperçu" : un clic sur la ligne ouvre le détail SANS quitter
+  // Aujourd'hui (pour pouvoir continuer à swiper le bandeau semaine) —
+  // seul le bouton dédié dans l'aperçu navigue vraiment vers l'écran complet.
+  const toggleExpanded = (key) => setExpandedItem(v => (v === key ? null : key))
 
   useEffect(() => {
     if (todayWod) {
@@ -54,17 +77,6 @@ export default function DashboardHome() {
     setToast(payload.status === 'published' ? 'WOD publié 💪' : 'Proposition envoyée')
     setTimeout(() => setToast(null), 2500)
   }
-
-  // Contenu perso/programme du JOUR SÉLECTIONNÉ dans le bandeau semaine
-  // (le WOD ci-dessous reste volontairement lié à "aujourd'hui" seulement —
-  // c'est un flux à part, alimenté par useWodData qui ne connaît que le jour
-  // présent). Filtré par les préférences "Mes groupes".
-  const isToday = selectedKey === toLocalKey(new Date())
-  const selectedSession = !isToday && prefs.isVisible('perso') ? cal.sessions.find(s => s.session_date === selectedKey) : null
-  const selectedProgramDays = !isToday
-    ? cal.programDays.filter(p => p.date === selectedKey && prefs.isVisible(`program:${p.programId}`))
-    : []
-  const selectedWod = !isToday && prefs.isVisible('wod') ? cal.wods.find(w => w.wod_date === selectedKey) : null
 
   return (
     <div className="stack">
@@ -92,35 +104,94 @@ export default function DashboardHome() {
           )}
           <div className="stack" style={{ gap: 8 }}>
             {selectedWod && (
-              <Link href={`/dashboard/wod/${selectedWod.id}`} className="pillarRow">
-                <span className="pillarIcon pillarIconWod">🏋️</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{selectedWod.title}</div>
-                  <div className="muted" style={{ fontSize: 11 }}>WOD de box — {WOD_FORMAT_LABELS[selectedWod.format]}</div>
-                </div>
-              </Link>
+              <div className="pillarBlock">
+                <button type="button" className={`pillarRow ${expandedItem === 'wod' ? 'pillarRowExpanded' : ''}`} onClick={() => toggleExpanded('wod')}>
+                  <span className="pillarIcon pillarIconWod">🏋️</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{selectedWod.title}</div>
+                    <div className="muted" style={{ fontSize: 11 }}>WOD de box — {WOD_FORMAT_LABELS[selectedWod.format]}</div>
+                  </div>
+                </button>
+                {expandedItem === 'wod' && (
+                  <div className="pillarPreview">
+                    {selectedWod.description ? (
+                      <p style={{ fontSize: 12.5, whiteSpace: 'pre-wrap' }}>{selectedWod.description}</p>
+                    ) : (
+                      <p className="muted" style={{ fontSize: 12 }}>Pas de description enregistrée.</p>
+                    )}
+                    <Link href={`/dashboard/wod/${selectedWod.id}`} className="btn btnGhost btnSm" style={{ marginTop: 8 }}>
+                      Voir le WOD →
+                    </Link>
+                  </div>
+                )}
+              </div>
             )}
             {selectedSession && (
-              <Link href={`/dashboard/perso?date=${selectedKey}`} className="pillarRow">
-                <span className="pillarIcon pillarIconPerso">📓</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>Séance perso</div>
-                  <div className="muted" style={{ fontSize: 11 }}>Loguée ce jour-là</div>
-                </div>
-                <span className="pillarCheck pillarCheckDone">✓</span>
-              </Link>
+              <div className="pillarBlock">
+                <button type="button" className={`pillarRow ${expandedItem === 'perso' ? 'pillarRowExpanded' : ''}`} onClick={() => toggleExpanded('perso')}>
+                  <span className="pillarIcon pillarIconPerso">📓</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{selectedSession.title || 'Séance perso'}</div>
+                    <div className="muted" style={{ fontSize: 11 }}>Loguée ce jour-là</div>
+                  </div>
+                  <span className="pillarCheck pillarCheckDone">✓</span>
+                </button>
+                {expandedItem === 'perso' && (
+                  <div className="pillarPreview">
+                    {selectedSession.notes && (
+                      <p style={{ fontSize: 12.5, whiteSpace: 'pre-wrap', marginBottom: 8 }}>{selectedSession.notes}</p>
+                    )}
+                    {sessionPreview.loading && <p className="muted" style={{ fontSize: 12 }}>Chargement…</p>}
+                    {!sessionPreview.loading && sessionPreview.error && (
+                      <p className="muted" style={{ fontSize: 12 }}>Détail indisponible pour l&apos;instant.</p>
+                    )}
+                    {!sessionPreview.loading && !sessionPreview.error && sessionPreview.blocks.length === 0 && !selectedSession.notes && (
+                      <p className="muted" style={{ fontSize: 12 }}>Pas de détail enregistré pour cette séance.</p>
+                    )}
+                    {!sessionPreview.loading && sessionPreview.blocks.length > 0 && (
+                      <div className="stack" style={{ gap: 6 }}>
+                        {sessionPreview.blocks.map((b, i) => (
+                          <div key={b.id} style={{ fontSize: 12.5 }}>
+                            <span style={{ fontWeight: 700 }}>
+                              {blockLetter(i)}/ {BLOCK_TYPE_ICON[b.block_type]} {blockSubtitle(b)}
+                            </span>
+                            {b.exercises.length > 0 && (
+                              <div className="muted" style={{ fontSize: 11.5 }}>
+                                {b.exercises.map(be => be.exercise?.name).filter(Boolean).join(' · ')}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <Link href={`/dashboard/perso?date=${selectedKey}`} className="btn btnGhost btnSm" style={{ marginTop: 10 }}>
+                      Ouvrir dans Perso →
+                    </Link>
+                  </div>
+                )}
+              </div>
             )}
             {selectedProgramDays.map(p => (
-              <Link key={p.programId} href={`/dashboard/programme/${p.programId}`} className="pillarRow">
-                <span className="pillarIcon pillarIconProgramme">📋</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>Programme</div>
-                  <div className="muted" style={{ fontSize: 11 }}>{p.done}/{p.total} bloc{p.total !== 1 ? 's' : ''} fait{p.done !== 1 ? 's' : ''}</div>
-                </div>
-                <span className={`pillarCheck ${p.done >= p.total && p.total > 0 ? 'pillarCheckDone' : ''}`}>
-                  {p.done >= p.total && p.total > 0 ? '✓' : ''}
-                </span>
-              </Link>
+              <div key={p.programId} className="pillarBlock">
+                <button type="button" className={`pillarRow ${expandedItem === `program:${p.programId}` ? 'pillarRowExpanded' : ''}`} onClick={() => toggleExpanded(`program:${p.programId}`)}>
+                  <span className="pillarIcon pillarIconProgramme">📋</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>Programme</div>
+                    <div className="muted" style={{ fontSize: 11 }}>{p.done}/{p.total} bloc{p.total !== 1 ? 's' : ''} fait{p.done !== 1 ? 's' : ''}</div>
+                  </div>
+                  <span className={`pillarCheck ${p.done >= p.total && p.total > 0 ? 'pillarCheckDone' : ''}`}>
+                    {p.done >= p.total && p.total > 0 ? '✓' : ''}
+                  </span>
+                </button>
+                {expandedItem === `program:${p.programId}` && (
+                  <div className="pillarPreview">
+                    <p style={{ fontSize: 12.5 }}>{p.done}/{p.total} bloc{p.total !== 1 ? 's' : ''} coché{p.done !== 1 ? 's' : ''} pour cette séance.</p>
+                    <Link href={`/dashboard/programme/${p.programId}`} className="btn btnGhost btnSm" style={{ marginTop: 8 }}>
+                      Ouvrir le programme →
+                    </Link>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>
