@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
@@ -152,18 +153,17 @@ export default function BoxPage() {
         <h1 className="h1">{box.activeBoxName}</h1>
       </div>
 
-      {box.memberships.length > 1 && (
-        <div className="card">
-          <h3 className="eyebrow" style={{ marginBottom: 8 }}>Changer de box</h3>
-          <div className="stack" style={{ gap: 8 }}>
-            {box.memberships.map(m => (
-              <button key={m.box_id} className={`btn ${m.box_id === box.activeBoxId ? 'btnPrimary' : 'btnGhost'} btnBlock`} onClick={() => box.switchBox(m.box_id)}>
-                {m.boxes.name}
-              </button>
-            ))}
-          </div>
+      <div className="card">
+        <h3 className="eyebrow" style={{ marginBottom: 8 }}>{box.memberships.length > 1 ? 'Mes communautés' : 'Communautés'}</h3>
+        <div className="stack" style={{ gap: 8 }}>
+          {box.memberships.length > 1 && box.memberships.map(m => (
+            <button key={m.box_id} className={`btn ${m.box_id === box.activeBoxId ? 'btnPrimary' : 'btnGhost'} btnBlock`} onClick={() => box.switchBox(m.box_id)}>
+              {m.boxes.name}
+            </button>
+          ))}
+          <Link href="/onboarding" className="btn btnGhost btnBlock">+ Créer ou rejoindre une autre communauté</Link>
         </div>
-      )}
+      </div>
 
       {box.isCoach && (
         <div className="card">
