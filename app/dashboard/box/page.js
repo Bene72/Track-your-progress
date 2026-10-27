@@ -153,7 +153,7 @@ export default function BoxPage() {
         <h1 className="h1">{box.activeBoxName}</h1>
       </div>
 
-      <div className="card">
+      {(box.memberships.length > 1 || box.isCoach) && <div className="card">
         <h3 className="eyebrow" style={{ marginBottom: 8 }}>{box.memberships.length > 1 ? 'Mes communautés' : 'Communautés'}</h3>
         <div className="stack" style={{ gap: 8 }}>
           {box.memberships.length > 1 && box.memberships.map(m => (
@@ -161,9 +161,9 @@ export default function BoxPage() {
               {m.boxes.name}
             </button>
           ))}
-          <Link href="/onboarding" className="btn btnGhost btnBlock">+ Créer ou rejoindre une autre communauté</Link>
+          {box.isCoach && <Link href="/onboarding" className="btn btnGhost btnBlock">+ Créer ou rejoindre une autre communauté</Link>}
         </div>
-      </div>
+      </div>}
 
       {box.isCoach && (
         <div className="card">
