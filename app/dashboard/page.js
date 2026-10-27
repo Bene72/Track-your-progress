@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
 import Link from 'next/link'
 import { useCurrentUser } from '../../lib/hooks/useCurrentUser'
 import { useBox } from '../../lib/hooks/useBox'
@@ -12,6 +13,7 @@ import { BLOCK_TYPE_ICON, blockLetter, blockSubtitle } from '../../components/pe
 import { localDateKey as toLocalKey } from '../../lib/date'
 import WodCard from '../../components/WodCard'
 import WodCreateForm from '../../components/WodCreateForm'
+import WodEditForm from '../../components/WodEditForm'
 import ScoreForm from '../../components/ScoreForm'
 import Leaderboard from '../../components/Leaderboard'
 import WeekStrip from '../../components/WeekStrip'
@@ -26,6 +28,8 @@ export default function DashboardHome() {
   const prefs = useGroupPrefs(userId)
   const { getLeaderboard } = wodData
   const [editing, setEditing] = useState(false)
+  const [editingWod, setEditingWod] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [creatingWod, setCreatingWod] = useState(false)
   const [scores, setScores] = useState([])
   const [toast, setToast] = useState(null)
@@ -58,7 +62,7 @@ export default function DashboardHome() {
   // seul le bouton dédié dans l'aperçu navigue vraiment vers l'écran complet.
   const toggleExpanded = (key) => setExpandedItem(v => (v === key ? null : key))
 
-  useEffect(() => { setEditing(false) }, [selectedKey])
+  useEffect(() => { setEditing(false); setEditingWod(false) }, [selectedKey])
 
   useEffect(() => {
     if (!selectedWod) { setScores([]); return }
@@ -86,6 +90,34 @@ export default function DashboardHome() {
     setCreatingWod(false)
     setToast(payload.status === 'published' ? 'WOD publié 💪' : 'Proposition envoyée')
     setTimeout(() => setToast(null), 2500)
+  }
+
+  // Modification / suppression du WOD affiché : réservé au coach de la box.
+  // Update ciblé sur la table `wods` uniquement : les scores déjà postés
+  // (wod_scores, liés par wod_id) restent intacts.
+  const handleUpdateWod = async (payload) => {
+    const { error } = await supabase.from('wods').update(payload).eq('id', selectedWod.id)
+    if (error) throw error
+    await Promise.all([cal.reload(), wodData.reload()])
+    setEditingWod(false)
+    setToast('WOD modifié ✅')
+    setTimeout(() => setToast(null), 2500)
+  }
+
+  const handleDeleteWod = async () => {
+    if (!confirm(`Supprimer "${selectedWod.title}" ? Cette action est irréversible.`)) return
+    setDeleting(true)
+    try {
+      await wodData.deleteWod(selectedWod.id)
+      await cal.reload()
+      setEditingWod(false)
+      setToast('WOD supprimé')
+    } catch (e) {
+      setToast(e.message || 'Erreur lors de la suppression')
+    } finally {
+      setDeleting(false)
+      setTimeout(() => setToast(null), 2500)
+    }
   }
 
   return (
@@ -206,7 +238,32 @@ export default function DashboardHome() {
         )
       ) : (
         <>
-          <WodCard wod={selectedWod} />
+          {editingWod ? (
+            <div className="card">
+              <h3 className="h2" style={{ fontSize: 18, marginBottom: 12 }}>Modifier le WOD</h3>
+              <WodEditForm wod={selectedWod} userId={userId} onSubmit={handleUpdateWod} onCancel={() => setEditingWod(false)} />
+            </div>
+          ) : (
+            <>
+              <WodCard wod={selectedWod} />
+              {box.isCoach && (
+                <div className="row" style={{ gap: 8 }}>
+                  <button type="button" className="btn btnGhost" style={{ flex: 1 }} onClick={() => setEditingWod(true)}>
+                    ✏️ Modifier ce WOD
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btnGhost"
+                    style={{ flex: 1, color: 'var(--rx, #e5484d)', borderColor: 'rgba(229,72,77,0.4)' }}
+                    onClick={handleDeleteWod}
+                    disabled={deleting}
+                  >
+                    {deleting ? 'Suppression...' : 'Supprimer'}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
 
           {mySelectedScore && !editing ? (
             <div className="card">
