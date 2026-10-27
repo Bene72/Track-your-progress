@@ -44,8 +44,10 @@ export default function OnboardingPage() {
     if (!parsed.success) { setError('Nom de box invalide (2 à 60 caractères).'); return }
     setLoading(true)
     try {
-      const { error } = await supabase.rpc('create_box', { box_name: sanitizeText(boxName, 60) })
+      const { data: newBoxId, error } = await supabase.rpc('create_box', { box_name: sanitizeText(boxName, 60) })
       if (error) throw error
+      // Active directement la nouvelle box (utile si on en a déjà une autre).
+      if (newBoxId) window.localStorage.setItem('boxlog_active_box_id', newBoxId)
       router.push('/dashboard')
     } catch (err) {
       setError(err.message)
@@ -58,8 +60,9 @@ export default function OnboardingPage() {
     if (!code.trim()) { setError('Entre un code d\'invitation.'); return }
     setLoading(true)
     try {
-      const { error } = await supabase.rpc('join_box_via_code', { invite_code: sanitizeText(code, 40) })
+      const { data: joinedBoxId, error } = await supabase.rpc('join_box_via_code', { invite_code: sanitizeText(code, 40) })
       if (error) throw error
+      if (joinedBoxId) window.localStorage.setItem('boxlog_active_box_id', joinedBoxId)
       router.push('/dashboard')
     } catch (err) {
       // Le RPC renvoie soit "Code invalide ou expiré", soit un message de
