@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import { sanitizeText, boxNameSchema } from '../../lib/security'
@@ -17,13 +17,21 @@ function looksLikeInviteCode(value) {
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const [tab, setTab] = useState('create') // 'create' | 'join'
+  const [tab, setTab] = useState('join') // 'create' | 'join'
+  const [canCreate, setCanCreate] = useState(false)
+
+  // Seuls les utilisateurs autorisés (table box_creators) voient l'onglet coach.
+  useEffect(() => {
+    supabase.rpc('can_create_box').then(({ data }) => {
+      if (data === true) { setCanCreate(true); setTab('create') }
+    })
+  }, [])
   const [boxName, setBoxName] = useState('')
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const suspiciousBoxName = tab === 'create' && looksLikeInviteCode(boxName)
+  const suspiciousBoxName = canCreate && tab === 'create' && looksLikeInviteCode(boxName)
 
   const handleCreate = async (e) => {
     e.preventDefault()
@@ -78,11 +86,11 @@ export default function OnboardingPage() {
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div className="eyebrow">Bienvenue</div>
           <h1 className="h1">Rejoins ta box</h1>
-          <p className="muted">Crée ta box en tant que coach, ou rejoins celle de ton coach avec un code.</p>
+          <p className="muted">Rejoins la box de ton coach avec son code d’invitation.</p>
         </div>
 
         <div className="segmented" style={{ marginBottom: 18 }}>
-          <button type="button" className={`segmentedBtn ${tab === 'create' ? 'segmentedBtnActive' : ''}`} onClick={() => setTab('create')}>Je suis coach</button>
+          {canCreate && <button type="button" className={`segmentedBtn ${tab === 'create' ? 'segmentedBtnActive' : ''}`} onClick={() => setTab('create')}>Je suis coach</button>}
           <button type="button" className={`segmentedBtn ${tab === 'join' ? 'segmentedBtnActive' : ''}`} onClick={() => setTab('join')}>J’ai un code</button>
         </div>
 
