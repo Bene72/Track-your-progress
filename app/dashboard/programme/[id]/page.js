@@ -4,20 +4,22 @@ import { useParams, useRouter } from 'next/navigation'
 import { useCurrentUser } from '../../../../lib/hooks/useCurrentUser'
 import { useBox } from '../../../../lib/hooks/useBox'
 import { useProgram, useExerciseCatalog, createPersonalExercise, useProgramsList } from '../../../../lib/hooks/usePrograms'
-import { formatSessionDateLabel, DAY_LABELS } from '../../../../lib/program-date'
+import { locateDate, computeSessionDate } from '../../../../lib/program-date'
+import { localDateKey } from '../../../../lib/date'
 import { defaultMuscleGroup } from '../../../../components/personal-session/helpers'
-import { getBlockType } from '../../../../lib/blockTypes'
 import ProgramBlockCard from '../../../../components/program/ProgramBlockCard'
+import ProgramCalendar from '../../../../components/program/ProgramCalendar'
 import AddBlockForm from '../../../../components/program/AddBlockForm'
 import DuplicateToAthleteForm from '../../../../components/program/DuplicateToAthleteForm'
 import { supabase } from '../../../../lib/supabase'
 
 const STATUS_LABELS = { draft: 'Brouillon', active: 'Actif', completed: 'Terminé', archived: 'Archivé' }
 const PERIOD_LABELS = { AM: 'Matin', PM: 'Soir', unique: 'Séance' }
+const DANGER_STYLE = { color: 'var(--danger)', borderColor: 'rgba(255,74,74,0.35)' }
 
-// Menu "•••" pour les actions sur la semaine active (Dupliquer / Supprimer)
-// — remplace 2 boutons toujours visibles par un menu compact, cf. retours UX.
-function WeekMenu({ onDuplicate, onDelete, canDelete, busy }) {
+// Menu "•••" pour les actions sur la semaine sélectionnée
+// (Renommer / Dupliquer / Supprimer).
+function WeekMenu({ onRename, onDuplicate, onDelete, canDelete, busy }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -34,6 +36,7 @@ function WeekMenu({ onDuplicate, onDelete, canDelete, busy }) {
       <button type="button" className="kebabBtn" disabled={busy} onClick={() => setOpen(v => !v)} aria-label="Actions semaine">•••</button>
       {open && (
         <div className="kebabPanel">
+          <button type="button" className="kebabItem" onClick={() => { setOpen(false); onRename() }}>✏️ Renommer cette semaine</button>
           <button type="button" className="kebabItem" onClick={() => { setOpen(false); onDuplicate() }}>📋 Dupliquer cette semaine</button>
           {canDelete && (
             <button type="button" className="kebabItem danger" onClick={() => { setOpen(false); onDelete() }}>🗑 Supprimer cette semaine</button>
@@ -51,23 +54,34 @@ export default function ProgramDetailPage() {
   const box = useBox()
   const {
     program, weeks, loading, error, canEditStructure,
-    addWeek, duplicateWeek, deleteWeek, addSession, deleteSession,
+    addWeek, duplicateWeek, deleteWeek, renameWeek, addSession, deleteSession,
     addBlock, updateBlock, deleteBlock, upsertMyLog, setStatus, duplicateToAthlete,
+    renameProgram, deleteProgram,
   } = useProgram(id, userId)
   const { catalog } = useExerciseCatalog(userId)
   const { athletes } = useProgramsList({ userId, boxId: box.activeBoxId, isCoach: box.isCoach })
 
-  const [activeWeekId, setActiveWeekId] = useState(null)
-  const [activeDay, setActiveDay] = useState(0)
+  // Jour sélectionné dans le calendrier (clé YYYY-MM-DD) → semaine + jour du
+  // programme. La navigation par date remplace les anciens onglets de semaines.
+  const [selectedKey, setSelectedKey] = useState(null)
   const [activePeriod, setActivePeriod] = useState('AM')
   const [athleteName, setAthleteName] = useState('')
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState(null)
   const [showDuplicateForm, setShowDuplicateForm] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [editingWeek, setEditingWeek] = useState(null) // { id, value } | null
 
+  // À l'ouverture : aujourd'hui si le programme est en cours, sinon son 1er jour.
   useEffect(() => {
-    if (weeks.length && !activeWeekId) setActiveWeekId(weeks[0].id)
-  }, [weeks, activeWeekId])
+    if (loading || !program || selectedKey) return
+    const today = localDateKey()
+    const loc = locateDate(program.start_date, today)
+    const inProgram = loc && weeks.some(w => w.week_number === loc.weekNumber)
+    setSelectedKey(inProgram ? today : program.start_date)
+  }, [loading, program, weeks, selectedKey])
 
   useEffect(() => {
     async function loadAthlete() {
@@ -79,9 +93,16 @@ export default function ProgramDetailPage() {
   }, [program?.athlete_id])
 
   const canEdit = program ? canEditStructure(userId, box.isCoach) : false
+  // Renommer / supprimer : mêmes droits que la RLS de la table programs
+  // (coach de la box ou créateur du programme).
+  const canManage = program ? (box.isCoach || program.created_by === userId) : false
   const isAthleteView = program?.athlete_id === userId
 
-  const activeWeek = weeks.find(w => w.id === activeWeekId)
+  const located = program && selectedKey ? locateDate(program.start_date, selectedKey) : null
+  const activeWeek = located ? weeks.find(w => w.week_number === located.weekNumber) || null : null
+  const activeDay = located?.dayOffset ?? 0
+  const maxWeekNumber = weeks.reduce((m, w) => Math.max(m, w.week_number), 0)
+
   const sessionsForDay = useMemo(
     () => (activeWeek?.sessions || []).filter(s => s.day_offset === activeDay),
     [activeWeek, activeDay]
@@ -106,18 +127,45 @@ export default function ProgramDetailPage() {
     }
   }
 
+  const selectWeekStart = (week) => setSelectedKey(computeSessionDate(program.start_date, week.week_number, 0))
+
   if (loading || box.loading) return <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>
   if (error) return <div className="errorBox">{error}</div>
   if (!program) return <div className="empty">Programme introuvable.</div>
+
+  const dateHeading = selectedKey
+    ? new Date(`${selectedKey}T00:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' })
+    : ''
 
   return (
     <div className="stack">
       <button className="action" onClick={() => router.push('/dashboard/programme')} style={{ alignSelf: 'flex-start' }}>← Retour</button>
 
       <div className="card">
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          <div>
-            <h1 className="h1">{program.name}</h1>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {renaming ? (
+              <>
+                <label className="label">Nom du programme</label>
+                <input
+                  className="input"
+                  value={nameDraft}
+                  onChange={e => setNameDraft(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !busy) runAction(async () => { await renameProgram(nameDraft); setRenaming(false) })
+                  }}
+                  autoFocus
+                />
+                <div className="action-row" style={{ marginTop: 8 }}>
+                  <button className="action" disabled={busy} onClick={() => setRenaming(false)}>Annuler</button>
+                  <button className="action primary" disabled={busy} onClick={() => runAction(async () => { await renameProgram(nameDraft); setRenaming(false) })}>
+                    Enregistrer
+                  </button>
+                </div>
+              </>
+            ) : (
+              <h1 className="h1">{program.name}</h1>
+            )}
             {athleteName && <p className="muted">Pour {athleteName}</p>}
           </div>
           <span className="badge">{STATUS_LABELS[program.status]}</span>
@@ -144,6 +192,37 @@ export default function ProgramDetailPage() {
                 📋 Dupliquer vers un autre athlète
               </button>
             )}
+            {canManage && !renaming && (
+              <button className="action" disabled={busy} onClick={() => { setNameDraft(program.name); setRenaming(true); setConfirmDelete(false) }}>
+                ✏️ Renommer
+              </button>
+            )}
+            {canManage && (
+              <button className="action" style={DANGER_STYLE} disabled={busy} onClick={() => { setConfirmDelete(v => !v); setRenaming(false) }}>
+                🗑 Supprimer
+              </button>
+            )}
+          </div>
+        )}
+        {confirmDelete && canManage && (
+          <div style={{ marginTop: 10 }}>
+            <p className="muted" style={{ fontSize: 13 }}>
+              Supprimer « {program.name} » ? Les semaines, séances et blocs seront définitivement effacés.
+            </p>
+            <div className="action-row" style={{ marginTop: 8 }}>
+              <button className="action" disabled={busy} onClick={() => setConfirmDelete(false)}>Annuler</button>
+              <button
+                className="action"
+                style={DANGER_STYLE}
+                disabled={busy}
+                onClick={() => runAction(async () => {
+                  await deleteProgram()
+                  router.push('/dashboard/programme')
+                })}
+              >
+                Supprimer définitivement
+              </button>
+            </div>
           </div>
         )}
         {program.status === 'draft' && canEdit && (
@@ -163,72 +242,99 @@ export default function ProgramDetailPage() {
         {actionError && <div className="errorBox" style={{ marginTop: 8 }}>{actionError}</div>}
       </div>
 
-      <div className="weekRow">
-        {weeks.map(w => (
-          <button
-            key={w.id}
-            className={`action ${activeWeekId === w.id ? 'primary' : ''}`}
-            onClick={() => { setActiveWeekId(w.id); setActiveDay(0) }}
-          >
-            {w.label || `S${w.week_number}`}
-          </button>
-        ))}
-        {canEdit && (
-          <>
-            <button className="action" disabled={busy} onClick={() => runAction(() => addWeek())}>＋ Ajouter une semaine</button>
+      <ProgramCalendar
+        startDate={program.start_date}
+        weeks={weeks}
+        athleteId={program.athlete_id}
+        selectedKey={selectedKey}
+        onSelect={setSelectedKey}
+      />
+
+      {/* Barre de la semaine contenant le jour sélectionné */}
+      <div className="row" style={{ justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          {editingWeek ? (
+            <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+              <input
+                className="input"
+                style={{ flex: 1, minWidth: 160 }}
+                value={editingWeek.value}
+                placeholder={`Semaine ${activeWeek?.week_number ?? ''}`}
+                onChange={e => setEditingWeek({ ...editingWeek, value: e.target.value })}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !busy) runAction(async () => { await renameWeek(editingWeek.id, editingWeek.value); setEditingWeek(null) })
+                }}
+                autoFocus
+              />
+              <button className="action" disabled={busy} onClick={() => setEditingWeek(null)}>Annuler</button>
+              <button className="action primary" disabled={busy} onClick={() => runAction(async () => { await renameWeek(editingWeek.id, editingWeek.value); setEditingWeek(null) })}>
+                OK
+              </button>
+            </div>
+          ) : (
+            <span className="eyebrow">
+              {activeWeek ? (activeWeek.label || `Semaine ${activeWeek.week_number}`) : located ? `Semaine ${located.weekNumber}` : 'Avant le programme'}
+            </span>
+          )}
+        </div>
+        {canEdit && !editingWeek && (
+          <div className="weekRow">
+            <button className="action" disabled={busy} onClick={() => runAction(async () => {
+              const w = await addWeek()
+              selectWeekStart(w)
+            })}>＋ Ajouter une semaine</button>
             {activeWeek && (
               <WeekMenu
                 busy={busy}
                 canDelete={weeks.length > 1}
+                onRename={() => setEditingWeek({ id: activeWeek.id, value: activeWeek.label || '' })}
                 onDuplicate={() => runAction(async () => {
                   const w = await duplicateWeek(activeWeek.id)
-                  setActiveWeekId(w.id)
+                  selectWeekStart(w)
                 })}
                 onDelete={() => runAction(async () => {
                   const idx = weeks.findIndex(w => w.id === activeWeek.id)
+                  const neighbour = weeks[idx === 0 ? 1 : idx - 1]
                   await deleteWeek(activeWeek.id)
-                  setActiveWeekId(weeks[idx === 0 ? 1 : idx - 1]?.id || null)
+                  if (neighbour) selectWeekStart(neighbour)
                 })}
               />
             )}
-          </>
+          </div>
         )}
       </div>
 
+      {/* Jour sélectionné */}
+      {selectedKey && (
+        <h3 className="eyebrow" style={{ textTransform: 'capitalize' }}>{dateHeading}</h3>
+      )}
+
+      {!located && selectedKey && (
+        <div className="card empty">
+          Ce jour est avant le début du programme ({new Date(`${program.start_date}T00:00:00`).toLocaleDateString('fr-FR')}).
+        </div>
+      )}
+
+      {located && !activeWeek && (
+        <div className="card empty">
+          {canEdit && located.weekNumber === maxWeekNumber + 1 ? (
+            <>
+              <p className="muted" style={{ marginBottom: 10 }}>La semaine {located.weekNumber} n&apos;existe pas encore.</p>
+              <button className="action primary" disabled={busy} onClick={() => runAction(async () => {
+                const w = await addWeek()
+                selectWeekStart(w)
+              })}>
+                ＋ Ajouter la semaine {located.weekNumber}
+              </button>
+            </>
+          ) : (
+            <p className="muted">Ce jour est en dehors des semaines du programme.</p>
+          )}
+        </div>
+      )}
+
       {activeWeek && (
         <>
-          {/* Vue semaine : les 7 jours d'un coup, avec type de séance (icône du
-              1er bloc) et nombre de blocs — le coach comprend la semaine sans
-              cliquer, plutôt qu'une rangée d'onglets Lun/Mar/Mer. */}
-          <div className="dayGrid">
-            {DAY_LABELS.map((label, offset) => {
-              const daySessions = activeWeek.sessions.filter(s => s.day_offset === offset)
-              const dateForDay = daySessions[0]?.session_date
-              const totalBlocks = daySessions.reduce((sum, s) => sum + s.blocks.length, 0)
-              const isRest = daySessions.length === 0
-              const isActive = activeDay === offset
-              const icons = daySessions.map(s => getBlockType(s.blocks[0]?.block_type).icon)
-              return (
-                <button
-                  key={offset}
-                  type="button"
-                  className={`dayCard ${isActive ? 'dayCardActive' : ''} ${isRest ? 'dayCardRest' : ''}`}
-                  onClick={() => setActiveDay(offset)}
-                >
-                  <span className="dayCardLabel">{label}{dateForDay ? ` ${new Date(`${dateForDay}T00:00:00`).getDate()}` : ''}</span>
-                  {isRest ? (
-                    <span className="dayCardRestTxt">{canEdit ? '＋' : '—'}</span>
-                  ) : (
-                    <>
-                      <span className="dayCardIcons">{icons.join(' ')}</span>
-                      <span className="dayCardCount">{totalBlocks} bloc{totalBlocks > 1 ? 's' : ''}</span>
-                    </>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-
           {canEdit && (
             <div className="action-row">
               {['AM', 'PM'].map(period => {
@@ -258,7 +364,6 @@ export default function ProgramDetailPage() {
 
           {activeSession ? (
             <div className="stack" style={{ gap: 8 }}>
-              <p className="muted mono">{formatSessionDateLabel(activeSession.session_date)}</p>
               {activeSession.blocks.map((block, i) => (
                 <ProgramBlockCard
                   key={block.id}
@@ -290,7 +395,9 @@ export default function ProgramDetailPage() {
               )}
             </div>
           ) : (
-            <div className="card empty">Aucune séance ce jour.</div>
+            <div className="card empty">
+              {canEdit ? 'Jour de repos. Ajoute une séance avec les boutons ci-dessus.' : 'Aucune séance ce jour.'}
+            </div>
           )}
         </>
       )}
