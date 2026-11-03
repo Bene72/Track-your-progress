@@ -44,10 +44,91 @@ function NewProgramForm({ athleteId, onCreate, onCancel }) {
   )
 }
 
+const DANGER_STYLE = { color: 'var(--danger)', borderColor: 'rgba(255,74,74,0.35)' }
+
+// Une ligne de programme : lien vers le détail + boutons Renommer / Supprimer
+// (affichés seulement si l'utilisateur peut gérer ce programme — coach ou
+// créateur, comme la RLS de la table programs).
+function ProgramRow({ program, canManage, onRename, onDelete }) {
+  const [mode, setMode] = useState(null) // null | 'rename' | 'delete'
+  const [name, setName] = useState(program.name)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+
+  const close = () => { setMode(null); setError(null) }
+
+  const run = async (fn) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await fn()
+      setMode(null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card">
+      {mode === 'rename' ? (
+        <>
+          <label className="label">Nom du programme</label>
+          <input
+            className="input"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !busy) run(() => onRename(program.id, name)) }}
+            autoFocus
+          />
+          <div className="action-row" style={{ marginTop: 10 }}>
+            <button className="action" onClick={close} disabled={busy}>Annuler</button>
+            <button className="action primary" onClick={() => run(() => onRename(program.id, name))} disabled={busy}>
+              {busy ? '...' : 'Enregistrer'}
+            </button>
+          </div>
+        </>
+      ) : (
+        <Link href={`/dashboard/programme/${program.id}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <strong style={{ color: 'white' }}>{program.name}</strong>
+            <span className="badge">{STATUS_LABELS[program.status]}</span>
+          </div>
+          <p className="muted" style={{ marginTop: 4 }}>Débute le {new Date(`${program.start_date}T00:00:00`).toLocaleDateString('fr-FR')}</p>
+        </Link>
+      )}
+
+      {canManage && mode === null && (
+        <div className="action-row" style={{ marginTop: 10 }}>
+          <button className="action" onClick={() => { setName(program.name); setMode('rename') }}>✏️ Renommer</button>
+          <button className="action" style={DANGER_STYLE} onClick={() => setMode('delete')}>🗑 Supprimer</button>
+        </div>
+      )}
+
+      {mode === 'delete' && (
+        <div style={{ marginTop: 10 }}>
+          <p className="muted" style={{ fontSize: 13 }}>
+            Supprimer « {program.name} » ? Les semaines, séances et blocs seront définitivement effacés.
+          </p>
+          <div className="action-row" style={{ marginTop: 8 }}>
+            <button className="action" onClick={close} disabled={busy}>Annuler</button>
+            <button className="action" style={DANGER_STYLE} onClick={() => run(() => onDelete(program.id))} disabled={busy}>
+              {busy ? '...' : 'Supprimer définitivement'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && <div className="errorBox" style={{ marginTop: 8 }}>{error}</div>}
+    </div>
+  )
+}
+
 export default function ProgrammePage() {
   const { userId } = useCurrentUser({ redirectIfNull: true })
   const box = useBox()
-  const { myPrograms, athletes, loading, error, createProgram } = useProgramsList({
+  const { myPrograms, athletes, loading, error, createProgram, renameProgram, deleteProgram } = useProgramsList({
     userId, boxId: box.activeBoxId, isCoach: box.isCoach,
   })
   const [creatingForSelf, setCreatingForSelf] = useState(false)
@@ -83,13 +164,13 @@ export default function ProgrammePage() {
       ) : (
         <div className="stack" style={{ gap: 8 }}>
           {myPrograms.map(p => (
-            <Link key={p.id} href={`/dashboard/programme/${p.id}`} className="card" style={{ display: 'block', textDecoration: 'none' }}>
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <strong style={{ color: 'white' }}>{p.name}</strong>
-                <span className="badge">{STATUS_LABELS[p.status]}</span>
-              </div>
-              <p className="muted" style={{ marginTop: 4 }}>Débute le {new Date(`${p.start_date}T00:00:00`).toLocaleDateString('fr-FR')}</p>
-            </Link>
+            <ProgramRow
+              key={p.id}
+              program={p}
+              canManage={box.isCoach || p.created_by === userId}
+              onRename={renameProgram}
+              onDelete={deleteProgram}
+            />
           ))}
         </div>
       )}
