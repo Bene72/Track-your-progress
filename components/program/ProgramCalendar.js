@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { localDateKey } from '../../lib/date'
 import { locateDate } from '../../lib/program-date'
+import { sessionProgress } from '../../lib/program-progress'
 
 // Calendrier mensuel d'un programme, même présentation que le calendrier des
 // WODs (app/dashboard/calendar/page.js) : grille lundi→dimanche, un point de
@@ -38,15 +39,8 @@ function monthOf(key) {
   return new Date(y, m - 1, 1)
 }
 
-// Log "fait / pas fait" de l'ATHLÈTE du programme (pas forcément l'utilisateur
-// connecté : un coach regarde le programme d'un athlète). myLog est la version
-// la plus fraîche quand l'athlète est l'utilisateur connecté.
-function athleteLog(block, athleteId) {
-  if (block.myLog && block.myLog.athlete_id === athleteId) return block.myLog
-  return (block.logs || []).find(l => l.athlete_id === athleteId) || null
-}
-
-export default function ProgramCalendar({ startDate, weeks, athleteId, selectedKey, onSelect }) {
+// bare : sans le cadre .card (quand le calendrier est affiché dans une fenêtre du bas).
+export default function ProgramCalendar({ startDate, weeks, athleteId, selectedKey, onSelect, bare = false }) {
   const [month, setMonth] = useState(() => monthOf(selectedKey || startDate))
 
   // Quand la sélection change (ex. "Aujourd'hui"), on affiche son mois.
@@ -61,9 +55,7 @@ export default function ProgramCalendar({ startDate, weeks, athleteId, selectedK
     const map = {}
     for (const w of weeks) {
       for (const s of w.sessions || []) {
-        const total = s.blocks.length
-        const done = s.blocks.filter(b => athleteLog(b, athleteId)?.status === 'done').length
-        ;(map[s.session_date] = map[s.session_date] || []).push({ total, done })
+        ;(map[s.session_date] = map[s.session_date] || []).push(sessionProgress(s, athleteId))
       }
     }
     return map
@@ -80,7 +72,7 @@ export default function ProgramCalendar({ startDate, weeks, athleteId, selectedK
   }
 
   return (
-    <div className="card">
+    <div className={bare ? '' : 'card'}>
       <div className="row" style={{ marginBottom: 14 }}>
         <button type="button" className="btn btnGhost btnSm" onClick={() => goToMonth(-1)} aria-label="Mois précédent">←</button>
         <div style={{ textAlign: 'center', flex: 1 }}>
