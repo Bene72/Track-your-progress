@@ -3,8 +3,11 @@ import { useState } from 'react'
 import ExerciseAutocomplete from '../personal-session/ExerciseAutocomplete'
 import { BLOCK_TYPES } from '../../lib/blockTypes'
 
-export default function AddBlockForm({ catalog, onAddBlock, onCreateExercise }) {
-  const [open, setOpen] = useState(false)
+// defaultOpen / onClose : permettent de l'afficher directement ouvert dans une
+// fenêtre du bas (bouton "Ajouter un bloc" de la barre d'actions), le parent
+// la referme quand le formulaire est validé ou annulé.
+export default function AddBlockForm({ catalog, onAddBlock, onCreateExercise, defaultOpen = false, onClose }) {
+  const [open, setOpen] = useState(defaultOpen)
   const [blockType, setBlockType] = useState('exercise')
   const [title, setTitle] = useState('')
   const [prescription, setPrescription] = useState('')
@@ -17,6 +20,7 @@ export default function AddBlockForm({ catalog, onAddBlock, onCreateExercise }) 
 
   const reset = () => {
     setBlockType('exercise'); setTitle(''); setPrescription(''); setNotes(''); setExerciseId(''); setVideoUrl(''); setPercent1rm(''); setOpen(false)
+    if (onClose) onClose()
   }
 
   const handleSubmit = async () => {
@@ -42,6 +46,7 @@ export default function AddBlockForm({ catalog, onAddBlock, onCreateExercise }) 
   }
 
   if (!open) {
+    if (defaultOpen) return null
     return (
       <button type="button" className="abf-open" onClick={() => setOpen(true)}>
         <style jsx>{`
