@@ -14,6 +14,7 @@ import DuplicateToAthleteForm from '../../../../components/program/DuplicateToAt
 import BottomSheet from '../../../../components/program/BottomSheet'
 import WeekDaySelector from '../../../../components/program/WeekDaySelector'
 import WeekOverview from '../../../../components/program/WeekOverview'
+import BlockReorderList from '../../../../components/program/BlockReorderList'
 import { supabase } from '../../../../lib/supabase'
 
 const STATUS_LABELS = { draft: 'Brouillon', active: 'Actif', completed: 'Terminé', archived: 'Archivé' }
@@ -84,7 +85,7 @@ export default function ProgramDetailPage() {
   const {
     program, weeks, loading, error, canEditStructure,
     addWeek, duplicateWeek, deleteWeek, renameWeek, addSession, deleteSession,
-    addBlock, updateBlock, deleteBlock, upsertMyLog, setStatus, duplicateToAthlete,
+    addBlock, updateBlock, deleteBlock, reorderBlocks, upsertMyLog, setStatus, duplicateToAthlete,
     renameProgram, deleteProgram,
   } = useProgram(id, userId)
   const { catalog } = useExerciseCatalog(userId)
@@ -104,6 +105,7 @@ export default function ProgramDetailPage() {
   const [showCalendar, setShowCalendar] = useState(false)
   const [showWeekOverview, setShowWeekOverview] = useState(false)
   const [showAddBlock, setShowAddBlock] = useState(false)
+  const [reordering, setReordering] = useState(false) // mode "Réorganiser" les blocs de la séance
 
   // À l'ouverture : aujourd'hui si le programme est en cours, sinon son 1er jour.
   useEffect(() => {
@@ -149,6 +151,9 @@ export default function ProgramDetailPage() {
       setActivePeriod(sessionsForDay[0].period)
     }
   }, [sessionsForDay, activePeriod])
+
+  // Le mode Réorganiser ne suit pas quand on change de jour / de séance.
+  useEffect(() => { setReordering(false) }, [activeSession?.id])
 
   const runAction = async (fn) => {
     setBusy(true)
@@ -423,7 +428,21 @@ export default function ProgramDetailPage() {
       {activeWeek && (
         activeSession ? (
           <div className="stack" style={{ gap: 9 }}>
-            {activeSession.blocks.map((block, i) => (
+            {canEdit && activeSession.blocks.length > 1 && (
+              <div className="pgReorderBar">
+                {reordering ? (
+                  <button type="button" className="action primary" onClick={() => setReordering(false)}>✓ Terminé</button>
+                ) : (
+                  <button type="button" className="action" onClick={() => setReordering(true)}>↕ Réorganiser</button>
+                )}
+              </div>
+            )}
+            {reordering && canEdit ? (
+              <BlockReorderList
+                blocks={activeSession.blocks}
+                onReorder={ids => reorderBlocks(activeWeek.id, activeSession.id, ids)}
+              />
+            ) : activeSession.blocks.map((block, i) => (
               <ProgramBlockCard
                 key={block.id}
                 block={block}
@@ -557,6 +576,8 @@ export default function ProgramDetailPage() {
         .pgPeriods button.pgPeriodActive { background: var(--accent); color: #16110D; }
         .pgPeriods button.pgPeriodAdd { color: var(--chalk-muted); border: 1px dashed var(--border-hi); }
         .pgPeriods button:disabled { opacity: .5; cursor: default; }
+
+        .pgReorderBar { display: flex; justify-content: flex-end; }
 
         .pgFooter {
           position: sticky; bottom: var(--mnav-h); z-index: 10; display: flex; gap: 8px;
