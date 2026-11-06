@@ -1,10 +1,11 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import { BoxProvider, useBoxContext } from '../../lib/context/BoxContext'
 import { useChatUnread } from '../../lib/hooks/useChatUnread'
+import { ChatUnreadProvider } from '../../lib/context/ChatUnreadContext'
 import NotificationBell from '../../components/NotificationBell'
 
 // Navigation en familles (inspirée des apps de coaching type FORGED) :
@@ -274,7 +275,9 @@ function DashboardShell({ children }) {
   const showSide = !loading && !!isCoach
   // UN SEUL abonnement Realtime pour le chat (cf. ChatUnreadDot) : le compteur
   // est transmis à la barre latérale ET au menu "Plus".
-  const { unreadCount } = useChatUnread(userId, activeBoxId)
+  const { unreadCount, markRead } = useChatUnread(userId, activeBoxId)
+  // Partagé avec la page Chat (qui ne doit PAS rappeler useChatUnread).
+  const chatUnread = useMemo(() => ({ unreadCount, markRead }), [unreadCount, markRead])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -282,6 +285,7 @@ function DashboardShell({ children }) {
   }
 
   return (
+    <ChatUnreadProvider value={chatUnread}>
     <div className={`shell ${showSide ? 'shellCoach' : ''}`}>
       {showSide && <DesktopLayoutStyles />}
       {showSide && <SideNav pathname={pathname} isCoach={isCoach} unreadCount={unreadCount} boxName={activeBoxName} />}
@@ -313,6 +317,7 @@ function DashboardShell({ children }) {
         <MoreMenu pathname={pathname} isCoach={isCoach} unreadCount={unreadCount} />
       </nav>
     </div>
+    </ChatUnreadProvider>
   )
 }
 
