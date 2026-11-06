@@ -235,9 +235,9 @@ export default function ProgramDetailPage() {
     {
       label: 'Programme',
       items: [
-        program.status === 'draft' && { key: 'publish', label: '🚀 Publier le programme', onClick: () => runAction(() => setStatus('active')) },
-        program.status === 'active' && { key: 'complete', label: '✅ Marquer terminé', onClick: () => runAction(() => setStatus('completed')) },
-        program.status !== 'archived' && { key: 'archive', label: '📦 Archiver', onClick: () => runAction(() => setStatus('archived')) },
+        canManage && program.status === 'draft' && { key: 'publish', label: '🚀 Publier le programme', onClick: () => runAction(() => setStatus('active')) },
+        canManage && program.status === 'active' && { key: 'complete', label: '✅ Marquer terminé', onClick: () => runAction(() => setStatus('completed')) },
+        canManage && program.status !== 'archived' && { key: 'archive', label: '📦 Archiver', onClick: () => runAction(() => setStatus('archived')) },
         box.isCoach && !isShared && { key: 'share', label: '🏟 Partager avec toute la box', onClick: () => runAction(() => setShared(true)) },
         box.isCoach && isShared && { key: 'unshare', label: '👤 Rendre individuel (retirer à la box)', onClick: () => runAction(() => setShared(false)) },
         box.isCoach && { key: 'duplicate', label: '📋 Dupliquer vers un autre athlète', onClick: () => setShowDuplicateForm(v => !v) },
@@ -304,7 +304,7 @@ export default function ProgramDetailPage() {
         <span className="badge" style={{ ...STATUS_STYLE[program.status], whiteSpace: 'nowrap' }}>● {STATUS_LABELS[program.status]}</span>
       </section>
 
-      {program.status === 'draft' && canEdit && (
+      {program.status === 'draft' && canManage && (
         <div className="pgDraft">
           <span className="muted" style={{ fontSize: 12 }}>
             {isShared ? 'Les membres de la box le verront une fois publié.' : 'L\u2019athlète sera notifié à la publication.'}
