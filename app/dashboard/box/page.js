@@ -61,6 +61,11 @@ export default function BoxPage() {
   const [inviteCode, setInviteCode] = useState('')
   const [codeTouched, setCodeTouched] = useState(false)
   const [inviteError, setInviteError] = useState(null)
+  // Administrateur de la plateforme (table platform_admins) : seul à pouvoir
+  // nommer ou retirer un coach. Le serveur revérifie (fonction set_member_role).
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [roleError, setRoleError] = useState(null)
+  const [roleBusy, setRoleBusy] = useState(null) // id de la ligne en cours
 
   const load = useCallback(async () => {
     if (!box.activeBoxId) return
@@ -88,6 +93,23 @@ export default function BoxPage() {
   }, [box.activeBoxId, box.isCoach])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!userId) return
+    supabase.rpc('is_platform_admin').then(({ data }) => setIsAdmin(data === true))
+  }, [userId])
+
+  const handleSetRole = async (m, role) => {
+    const name = m.profiles?.full_name || 'ce membre'
+    const msg = role === 'coach' ? `Nommer ${name} coach de ${box.activeBoxName} ?` : `Retirer le rôle de coach à ${name} ?`
+    if (!confirm(msg)) return
+    setRoleBusy(m.id)
+    setRoleError(null)
+    const { error } = await supabase.rpc('set_member_role', { p_box: box.activeBoxId, p_user: m.user_id, p_role: role })
+    setRoleBusy(null)
+    if (error) { setRoleError(error.message); return }
+    await load()
+  }
 
   // Pré-remplit le champ code avec une suggestion basée sur le nom de la box,
   // tant que le coach n'a pas commencé à l'éditer lui-même.
@@ -236,9 +258,19 @@ export default function BoxPage() {
             <div key={m.id} className="leaderRow">
               <span className="leaderName">{m.profiles?.full_name || '—'}{m.user_id === userId ? ' (toi)' : ''}</span>
               {m.role === 'coach' && <span className="badge badgeAccent">Coach</span>}
+              {isAdmin && m.user_id !== userId && (
+                <button
+                  className="btn btnGhost btnSm"
+                  disabled={roleBusy === m.id}
+                  onClick={() => handleSetRole(m, m.role === 'coach' ? 'member' : 'coach')}
+                >
+                  {m.role === 'coach' ? 'Retirer coach' : 'Nommer coach'}
+                </button>
+              )}
             </div>
           ))}
         </div>
+        {roleError && <div className="errorBox" style={{ marginTop: 8 }}>{roleError}</div>}
       </div>
 
       <button className="btn btnGhost btnBlock" onClick={handleLeave}>Quitter cette box</button>
