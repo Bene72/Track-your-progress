@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useCurrentUser } from '../../../lib/hooks/useCurrentUser'
 import { useBox } from '../../../lib/hooks/useBox'
-import { useChatUnread } from '../../../lib/hooks/useChatUnread'
+import { useChatUnreadContext } from '../../../lib/context/ChatUnreadContext'
 import BoxChat from '../../../components/BoxChat'
 
 // Salons façon Discord, rangés par catégories. L'id est la valeur passée à
@@ -31,7 +31,8 @@ const STORAGE_KEY = 'chat:lastChannel'
 export default function ChatPage() {
   const { userId } = useCurrentUser({ redirectIfNull: true })
   const box = useBox()
-  const { markRead } = useChatUnread(userId, box.activeBoxId)
+  // Compteur fourni par le layout : un seul abonnement Realtime pour toute l'appli.
+  const { markRead } = useChatUnreadContext()
   const [channelId, setChannelId] = useState('general')
 
   // Retrouve le dernier salon ouvert (par navigateur).
