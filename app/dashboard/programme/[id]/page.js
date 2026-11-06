@@ -137,7 +137,11 @@ export default function ProgramDetailPage() {
   // Renommer / supprimer : mêmes droits que la RLS de la table programs
   // (coach de la box ou créateur du programme).
   const canManage = program ? (box.isCoach || program.created_by === userId) : false
-  const isAthleteView = program?.athlete_id === userId
+  // Programme partagé de la box : lecture seule pour les membres, géré par les
+  // coachs. Rattaché au coach (athlete_id) mais le programme "perso" de
+  // personne : ni suivi athlète ni ressenti dessus.
+  const isShared = program?.is_shared === true
+  const isAthleteView = program?.athlete_id === userId && !isShared
 
   const located = program && selectedKey ? locateDate(program.start_date, selectedKey) : null
   const activeWeek = located ? weeks.find(w => w.week_number === located.weekNumber) || null : null
@@ -203,7 +207,8 @@ export default function ProgramDetailPage() {
   if (!program) return <div className="empty">Programme introuvable.</div>
 
   const todayKey = localDateKey()
-  const showBoard = isDesktop && view === 'week' && !!located && !!activeWeek
+  // Vue semaine en colonnes : coach uniquement (les adhérents gardent la vue jour).
+  const showBoard = box.isCoach && isDesktop && view === 'week' && !!located && !!activeWeek
   const dayMode = !showBoard
   const dateHeading = selectedKey
     ? capitalize(new Date(`${selectedKey}T00:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }))
@@ -291,7 +296,7 @@ export default function ProgramDetailPage() {
             <h1 className="h1" style={{ margin: '4px 0 3px' }}>{program.name}</h1>
           )}
           <div className="muted" style={{ fontSize: 12 }}>
-            {athleteName ? `Pour ${athleteName} · ` : ''}{weeks.length} semaine{weeks.length > 1 ? 's' : ''}
+            {isShared ? 'Programme de la box · ' : athleteName ? `Pour ${athleteName} · ` : ''}{weeks.length} semaine{weeks.length > 1 ? 's' : ''}
           </div>
         </div>
         <span className="badge" style={{ ...STATUS_STYLE[program.status], whiteSpace: 'nowrap' }}>● {STATUS_LABELS[program.status]}</span>
@@ -299,7 +304,9 @@ export default function ProgramDetailPage() {
 
       {program.status === 'draft' && canEdit && (
         <div className="pgDraft">
-          <span className="muted" style={{ fontSize: 12 }}>L&apos;athlète sera notifié à la publication.</span>
+          <span className="muted" style={{ fontSize: 12 }}>
+            {isShared ? 'Les membres de la box le verront une fois publié.' : 'L\u2019athlète sera notifié à la publication.'}
+          </span>
           <button className="action primary" disabled={busy} onClick={() => runAction(() => setStatus('active'))}>Publier</button>
         </div>
       )}
@@ -351,10 +358,12 @@ export default function ProgramDetailPage() {
           </div>
           <div className="pgWeekMeta pgEllipsis">{weekSub}</div>
         </div>
-        <div className="pgPeriods pgViewToggle" role="group" aria-label="Affichage">
-          <button type="button" className={view === 'day' ? 'pgPeriodActive' : ''} onClick={() => setView('day')}>Jour</button>
-          <button type="button" className={view === 'week' ? 'pgPeriodActive' : ''} onClick={() => setView('week')}>Semaine</button>
-        </div>
+        {box.isCoach && (
+          <div className="pgPeriods pgViewToggle" role="group" aria-label="Affichage">
+            <button type="button" className={view === 'day' ? 'pgPeriodActive' : ''} onClick={() => setView('day')}>Jour</button>
+            <button type="button" className={view === 'week' ? 'pgPeriodActive' : ''} onClick={() => setView('week')}>Semaine</button>
+          </div>
+        )}
         <button type="button" className="pgCalBtn" onClick={() => setShowCalendar(true)}>▦ Calendrier</button>
         <button type="button" className="pgNavBtn" disabled={nextWeekNumber == null} onClick={() => goWeek(1)} aria-label="Semaine suivante">›</button>
       </section>
@@ -497,7 +506,7 @@ export default function ProgramDetailPage() {
                 onUpsertLog={(blockId, patch) => upsertMyLog(activeWeek.id, activeSession.id, blockId, patch)}
               />
             ))}
-            {!reordering && activeSession.blocks.length > 0 && ((box.isCoach && !isAthleteView) || (isAthleteView && selectedKey <= todayKey)) && (
+            {!reordering && !isShared && activeSession.blocks.length > 0 && ((box.isCoach && !isAthleteView) || (isAthleteView && selectedKey <= todayKey)) && (
               <DayFeeling
                 key={selectedKey}
                 feeling={feelings[selectedKey]}
@@ -535,7 +544,7 @@ export default function ProgramDetailPage() {
 
       {/* 7. Barre d'action fixe en bas */}
       {dayMode && activeWeek && (
-        <div className="pgFooter">
+        <div className={`pgFooter ${box.isCoach ? 'pgFooterCoach' : ''}`}>
           <button type="button" className="pgSecondary" onClick={() => setShowWeekOverview(true)}>Vue semaine</button>
           {canEdit && activeSession && (
             <button type="button" className="pgPrimary" onClick={() => setShowAddBlock(true)}>＋ Ajouter un bloc</button>
@@ -630,7 +639,7 @@ export default function ProgramDetailPage() {
         .pgViewToggle { display: none; }
         @media (min-width: 1024px) {
           .pgViewToggle { display: flex; }
-          .pgFooter { bottom: 0; }
+          .pgFooter.pgFooterCoach { bottom: 0; } /* barre du bas masquée = coach sur grand écran */
         }
 
         .pgFooter {
