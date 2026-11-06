@@ -88,7 +88,7 @@ export default function ProgramDetailPage() {
   const {
     program, weeks, loading, error, canEditStructure,
     addWeek, duplicateWeek, deleteWeek, renameWeek, addSession, deleteSession,
-    addBlock, updateBlock, deleteBlock, reorderBlocks, upsertMyLog, setStatus, duplicateToAthlete,
+    addBlock, updateBlock, deleteBlock, reorderBlocks, upsertMyLog, setStatus, setShared, duplicateToAthlete,
     renameProgram, deleteProgram,
   } = useProgram(id, userId)
   const { catalog } = useExerciseCatalog(userId)
@@ -238,6 +238,8 @@ export default function ProgramDetailPage() {
         program.status === 'draft' && { key: 'publish', label: '🚀 Publier le programme', onClick: () => runAction(() => setStatus('active')) },
         program.status === 'active' && { key: 'complete', label: '✅ Marquer terminé', onClick: () => runAction(() => setStatus('completed')) },
         program.status !== 'archived' && { key: 'archive', label: '📦 Archiver', onClick: () => runAction(() => setStatus('archived')) },
+        box.isCoach && !isShared && { key: 'share', label: '🏟 Partager avec toute la box', onClick: () => runAction(() => setShared(true)) },
+        box.isCoach && isShared && { key: 'unshare', label: '👤 Rendre individuel (retirer à la box)', onClick: () => runAction(() => setShared(false)) },
         box.isCoach && { key: 'duplicate', label: '📋 Dupliquer vers un autre athlète', onClick: () => setShowDuplicateForm(v => !v) },
         canManage && { key: 'rename', label: '✏️ Renommer le programme', onClick: () => { setNameDraft(program.name); setRenaming(true); setConfirmDelete(false) } },
         canManage && { key: 'delete', label: '🗑 Supprimer le programme', danger: true, onClick: () => { setConfirmDelete(true); setRenaming(false) } },
