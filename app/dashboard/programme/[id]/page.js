@@ -268,7 +268,7 @@ export default function ProgramDetailPage() {
     <div className="stack">
       {/* 1. Barre du haut : retour + menu d'actions */}
       <div className="pgTop">
-        <button type="button" className="pgBack" onClick={() => router.push('/dashboard/programme')}>← Programmes</button>
+        <button type="button" className="pgBack" onClick={() => router.push('/dashboard/programme?liste=1')}>← Programmes</button>
         <ActionsMenu sections={menuSections} busy={busy} />
       </div>
 
@@ -326,7 +326,7 @@ export default function ProgramDetailPage() {
               disabled={busy}
               onClick={() => runAction(async () => {
                 await deleteProgram()
-                router.push('/dashboard/programme')
+                router.push('/dashboard/programme?liste=1')
               })}
             >
               Supprimer définitivement
