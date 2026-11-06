@@ -205,6 +205,25 @@ export default function ProgrammePage() {
   const [creatingForAthlete, setCreatingForAthlete] = useState(null)
   const [viewingAthlete, setViewingAthlete] = useState(null) // adhérent dont on affiche les programmes
   const router = useRouter()
+
+  // Un adhérent qui ouvre « Programme » arrive directement sur le programme
+  // ACTIF de la box. On l'évite si l'URL contient ?liste (bouton « ← Programmes »
+  // de la page détail) ou si l'adhérent a déjà un programme individuel actif.
+  // window.location est lu dans un effet pour ne pas dépendre de useSearchParams.
+  const [urlChecked, setUrlChecked] = useState(false)
+  const [showList, setShowList] = useState(false)
+  useEffect(() => {
+    setShowList(new URLSearchParams(window.location.search).has('liste'))
+    setUrlChecked(true)
+  }, [])
+  const redirectTarget = (!loading && !box.loading && urlChecked && !showList && !box.isCoach
+    && !myPrograms.some(p => p.status === 'active'))
+    ? boxPrograms.find(p => p.status === 'active') || null
+    : null
+  useEffect(() => {
+    if (redirectTarget) router.replace(`/dashboard/programme/${redirectTarget.id}`)
+  }, [redirectTarget, router])
+
   const members = athletes.filter(a => a.role === 'member')
 
   const handleCreate = async (payload) => {
@@ -214,7 +233,7 @@ export default function ProgrammePage() {
     router.push(`/dashboard/programme/${program.id}`)
   }
 
-  if (loading || box.loading) return <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>
+  if (loading || box.loading || !urlChecked || redirectTarget) return <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>
 
   return (
     <div className="stack">
