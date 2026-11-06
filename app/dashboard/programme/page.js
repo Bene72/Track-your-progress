@@ -10,7 +10,13 @@ import CoachDashboardCard from '../../../components/program/CoachDashboardCard'
 
 const STATUS_LABELS = { draft: 'Brouillon', active: 'Actif', completed: 'Terminé', archived: 'Archivé' }
 
-function NewProgramForm({ athleteId, onCreate, onCancel }) {
+// Création d'un programme. Pour un coach, deux choix :
+//  - "Toute la box" : un seul programme partagé, consulté en lecture seule par
+//    tous les membres une fois publié ;
+//  - "Individuel" : programme attribué à un athlète (soi-même ou un membre).
+function NewProgramForm({ athleteId, canChooseScope = false, athletes = [], onCreate, onCancel }) {
+  const [scope, setScope] = useState(canChooseScope ? 'box' : 'individual')
+  const [targetId, setTargetId] = useState(athleteId)
   const [name, setName] = useState('')
   const [startDate, setStartDate] = useState(localDateKey())
   const [saving, setSaving] = useState(false)
@@ -21,7 +27,7 @@ function NewProgramForm({ athleteId, onCreate, onCancel }) {
     setSaving(true)
     setError(null)
     try {
-      await onCreate({ athleteId, name: name.trim(), startDate })
+      await onCreate({ athleteId: targetId, shared: scope === 'box', name: name.trim(), startDate })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -31,7 +37,30 @@ function NewProgramForm({ athleteId, onCreate, onCancel }) {
 
   return (
     <div className="card" style={{ marginTop: 8 }}>
-      <label className="label">Nom du programme</label>
+      {canChooseScope && (
+        <>
+          <label className="label">Pour qui ?</label>
+          <div className="action-row">
+            <button type="button" className={`action ${scope === 'box' ? 'primary' : ''}`} onClick={() => setScope('box')}>🏟 Toute la box</button>
+            <button type="button" className={`action ${scope === 'individual' ? 'primary' : ''}`} onClick={() => setScope('individual')}>👤 Individuel</button>
+          </div>
+          <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+            {scope === 'box'
+              ? 'Un seul programme, visible en lecture seule par tous les membres une fois publié.'
+              : 'Programme attribué à un seul athlète.'}
+          </p>
+          {scope === 'individual' && (
+            <>
+              <label className="label" style={{ marginTop: 8 }}>Athlète</label>
+              <select className="input" value={targetId} onChange={e => setTargetId(e.target.value)}>
+                <option value={athleteId}>Moi</option>
+                {athletes.map(a => <option key={a.userId} value={a.userId}>{a.name}</option>)}
+              </select>
+            </>
+          )}
+        </>
+      )}
+      <label className="label" style={{ marginTop: canChooseScope ? 8 : 0 }}>Nom du programme</label>
       <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder='Ex. "Cycle force — 6 semaines"' autoFocus />
       <label className="label" style={{ marginTop: 8 }}>Date de début (semaine 1, lundi)</label>
       <input className="input" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
@@ -92,7 +121,7 @@ function ProgramRow({ program, canManage, onRename, onDelete }) {
       ) : (
         <Link href={`/dashboard/programme/${program.id}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
           <div className="row" style={{ justifyContent: 'space-between' }}>
-            <strong style={{ color: 'white' }}>{program.name}</strong>
+            <strong style={{ color: 'white' }}>{program.is_shared ? '🏟 ' : ''}{program.name}</strong>
             <span className="badge">{STATUS_LABELS[program.status]}</span>
           </div>
           <p className="muted" style={{ marginTop: 4 }}>Débute le {new Date(`${program.start_date}T00:00:00`).toLocaleDateString('fr-FR')}</p>
@@ -128,12 +157,13 @@ function ProgramRow({ program, canManage, onRename, onDelete }) {
 export default function ProgrammePage() {
   const { userId } = useCurrentUser({ redirectIfNull: true })
   const box = useBox()
-  const { myPrograms, athletes, loading, error, createProgram, renameProgram, deleteProgram } = useProgramsList({
+  const { myPrograms, boxPrograms, athletes, loading, error, createProgram, renameProgram, deleteProgram } = useProgramsList({
     userId, boxId: box.activeBoxId, isCoach: box.isCoach,
   })
   const [creatingForSelf, setCreatingForSelf] = useState(false)
   const [creatingForAthlete, setCreatingForAthlete] = useState(null)
   const router = useRouter()
+  const members = athletes.filter(a => a.role === 'member')
 
   const handleCreate = async (payload) => {
     const program = await createProgram(payload)
@@ -151,12 +181,29 @@ export default function ProgrammePage() {
       </div>
       {error && <div className="errorBox">{error}</div>}
 
+      {boxPrograms.length > 0 && (
+        <>
+          <h2 className="h2">Programmes de la box</h2>
+          <div className="stack" style={{ gap: 8 }}>
+            {boxPrograms.map(p => (
+              <ProgramRow
+                key={p.id}
+                program={p}
+                canManage={box.isCoach || p.created_by === userId}
+                onRename={renameProgram}
+                onDelete={deleteProgram}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h2 className="h2">Mes programmes</h2>
         <button className="action primary" onClick={() => setCreatingForSelf(v => !v)}>Programmer</button>
       </div>
       {creatingForSelf && (
-        <NewProgramForm athleteId={userId} onCreate={handleCreate} onCancel={() => setCreatingForSelf(false)} />
+        <NewProgramForm athleteId={userId} canChooseScope={box.isCoach} athletes={members} onCreate={handleCreate} onCancel={() => setCreatingForSelf(false)} />
       )}
 
       {myPrograms.length === 0 ? (
