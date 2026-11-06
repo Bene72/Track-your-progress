@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCurrentUser } from '../../../lib/hooks/useCurrentUser'
@@ -69,6 +69,47 @@ function NewProgramForm({ athleteId, canChooseScope = false, athletes = [], onCr
         <button className="action" onClick={onCancel}>Annuler</button>
         <button className="action primary" onClick={handleSubmit} disabled={saving}>{saving ? '...' : 'Créer'}</button>
       </div>
+    </div>
+  )
+}
+
+// Programmes d'un adhérent (vue coach, dans « Mon effectif ») : chargés à la
+// demande, avec Renommer / Supprimer. On met aussi à jour la liste locale car
+// les actions du hook ne connaissent que « mes programmes » et ceux de la box.
+function MemberPrograms({ athleteId, fetchPrograms, onRename, onDelete }) {
+  const [programs, setPrograms] = useState(null)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchPrograms(athleteId)
+      .then(data => { if (!cancelled) setPrograms(data) })
+      .catch(err => { if (!cancelled) setError(err.message) })
+    return () => { cancelled = true }
+  }, [athleteId, fetchPrograms])
+
+  if (error) return <div className="errorBox" style={{ marginTop: 8 }}>{error}</div>
+  if (!programs) return <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>Chargement…</div>
+  if (programs.length === 0) return <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>Aucun programme pour cet adhérent.</p>
+
+  return (
+    <div className="stack" style={{ gap: 8, marginTop: 8 }}>
+      {programs.map(p => (
+        <ProgramRow
+          key={p.id}
+          program={p}
+          canManage
+          onRename={async (id, name) => {
+            const updated = await onRename(id, name)
+            setPrograms(prev => prev.map(x => (x.id === id ? updated : x)))
+            return updated
+          }}
+          onDelete={async (id) => {
+            await onDelete(id)
+            setPrograms(prev => prev.filter(x => x.id !== id))
+          }}
+        />
+      ))}
     </div>
   )
 }
@@ -157,11 +198,12 @@ function ProgramRow({ program, canManage, onRename, onDelete }) {
 export default function ProgrammePage() {
   const { userId } = useCurrentUser({ redirectIfNull: true })
   const box = useBox()
-  const { myPrograms, boxPrograms, athletes, loading, error, createProgram, renameProgram, deleteProgram } = useProgramsList({
+  const { myPrograms, boxPrograms, athletes, loading, error, fetchProgramsForAthlete, createProgram, renameProgram, deleteProgram } = useProgramsList({
     userId, boxId: box.activeBoxId, isCoach: box.isCoach,
   })
   const [creatingForSelf, setCreatingForSelf] = useState(false)
   const [creatingForAthlete, setCreatingForAthlete] = useState(null)
+  const [viewingAthlete, setViewingAthlete] = useState(null) // adhérent dont on affiche les programmes
   const router = useRouter()
   const members = athletes.filter(a => a.role === 'member')
 
@@ -232,10 +274,23 @@ export default function ProgrammePage() {
               <div key={a.userId} className="card">
                 <div className="row" style={{ justifyContent: 'space-between' }}>
                   <strong style={{ color: 'white' }}>{a.name}</strong>
-                  <button className="action" onClick={() => setCreatingForAthlete(v => (v === a.userId ? null : a.userId))}>
-                    Programmer
-                  </button>
+                  <div className="row" style={{ gap: 6 }}>
+                    <button className="action" onClick={() => setViewingAthlete(v => (v === a.userId ? null : a.userId))}>
+                      {viewingAthlete === a.userId ? 'Masquer' : 'Programmes'}
+                    </button>
+                    <button className="action" onClick={() => setCreatingForAthlete(v => (v === a.userId ? null : a.userId))}>
+                      Programmer
+                    </button>
+                  </div>
                 </div>
+                {viewingAthlete === a.userId && (
+                  <MemberPrograms
+                    athleteId={a.userId}
+                    fetchPrograms={fetchProgramsForAthlete}
+                    onRename={renameProgram}
+                    onDelete={deleteProgram}
+                  />
+                )}
                 {creatingForAthlete === a.userId && (
                   <NewProgramForm athleteId={a.userId} onCreate={handleCreate} onCancel={() => setCreatingForAthlete(null)} />
                 )}
