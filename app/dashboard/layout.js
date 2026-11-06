@@ -7,22 +7,45 @@ import { BoxProvider, useBoxContext } from '../../lib/context/BoxContext'
 import { useChatUnread } from '../../lib/hooks/useChatUnread'
 import NotificationBell from '../../components/NotificationBell'
 
-// Nav principale : les 3 piliers d'entraînement (WOD de box, Perso,
-// Programme coach→athlète). Calendrier est accessible depuis "Aujourd'hui"
-// (bouton en haut de la page) + reste dans "Plus" pour ne pas ajouter de 5e
-// item à la barre mobile.
-const PRIMARY_NAV = [
-  { href: '/dashboard', label: 'Aujourd\'hui', icon: HomeIcon },
-  { href: '/dashboard/perso', label: 'Perso', icon: DumbbellIcon },
-  { href: '/dashboard/programme', label: 'Programme', icon: ProgramIcon },
+// Navigation en familles (inspirée des apps de coaching type FORGED) :
+//  - grand écran (≥ 1024 px) : barre latérale à gauche, toutes les familles ;
+//  - mobile : barre du bas = les 3 piliers d'entraînement (PRIMARY_HREFS) +
+//    "Plus", qui ouvre les AUTRES entrées rangées par famille.
+// Une seule source de vérité : ajouter une page ici la fait apparaître aux deux
+// endroits. coachOnly = visible pour les coachs de la box uniquement.
+const NAV_GROUPS = [
+  { label: null, items: [
+    { href: '/dashboard', label: 'Aujourd\'hui', icon: HomeIcon, exact: true },
+  ] },
+  { label: 'Entraînement', items: [
+    { href: '/dashboard/programme', label: 'Programme', icon: ProgramIcon },
+    { href: '/dashboard/perso', label: 'Perso', icon: DumbbellIcon },
+    { href: '/dashboard/calendar', label: 'Calendrier', icon: CalendarIcon },
+    { href: '/dashboard/pr', label: 'Mes PR', icon: TrophyIcon },
+  ] },
+  { label: 'Ma box', items: [
+    { href: '/dashboard/wod', label: 'Le tableau', icon: BoardIcon },
+    { href: '/dashboard/chat', label: 'Chat', icon: ChatIcon, chat: true },
+    { href: '/dashboard/box', label: 'Ma box', icon: UsersIcon },
+    { href: '/dashboard/coach', label: 'Dashboard coach', icon: ChartIcon, coachOnly: true },
+  ] },
 ]
 
-const MORE_NAV = [
-  { href: '/dashboard/calendar', label: 'Calendrier', icon: CalendarIcon },
-  { href: '/dashboard/pr', label: 'Mes PR', icon: TrophyIcon },
-  { href: '/dashboard/chat', label: 'Chat', icon: ChatIcon },
-  { href: '/dashboard/box', label: 'Ma box', icon: UsersIcon },
-]
+const PRIMARY_HREFS = ['/dashboard', '/dashboard/perso', '/dashboard/programme']
+const PRIMARY_NAV = PRIMARY_HREFS.map(href => NAV_GROUPS.flatMap(g => g.items).find(i => i.href === href))
+
+// Page courante : correspondance exacte ou sous-page ("/dashboard/programme/12").
+// Un simple startsWith serait faux : "/dashboard/programme" commence par
+// "/dashboard/pr" et allumerait aussi "Mes PR".
+function isItemActive(item, pathname) {
+  return pathname === item.href || (!item.exact && pathname.startsWith(`${item.href}/`))
+}
+
+function visibleGroups(groups, isCoach) {
+  return groups
+    .map(g => ({ ...g, items: g.items.filter(i => !i.coachOnly || isCoach) }))
+    .filter(g => g.items.length > 0)
+}
 
 function HomeIcon({ active }) {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.8}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -46,6 +69,13 @@ function UsersIcon({ active }) {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.8}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
 }
 
+function BoardIcon({ active }) {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.8}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+}
+function ChartIcon({ active }) {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.8}><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+}
+
 function MoreIcon({ active }) {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.8}><circle cx="12" cy="5" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.4" fill="currentColor" stroke="none"/></svg>
 }
@@ -62,7 +92,7 @@ function BoxErrorBanner() {
 
 // Petit badge "non lu" affiché à 2 endroits (déclencheur "Plus" + item Chat
 // du panneau). Composant purement visuel : le comptage vient d'un SEUL appel
-// à useChatUnread dans MoreMenu ci-dessous, jamais d'un hook par instance —
+// à useChatUnread dans DashboardShell ci-dessous, jamais d'un hook par instance —
 // sinon 2 composants qui s'abonnent au même channel Realtime
 // (`chat-unread:{boxId}:{channel}`) font planter l'appli avec "cannot add
 // postgres_changes callbacks ... after subscribe()" dès que le 2e .on() est
@@ -72,14 +102,18 @@ function ChatUnreadDot({ count }) {
   return <span className="navUnreadDot">{count > 9 ? '9+' : count}</span>
 }
 
-// Popover "Plus" : regroupe Calendrier / Mes PR / Chat / Ma box pour garder
-// une barre de nav mobile à 4 items (les 3 piliers d'entraînement + Plus).
-function MoreMenu({ pathname }) {
+// Popover "Plus" : les entrées qui ne sont pas dans la barre mobile (3 piliers
+// d'entraînement + Plus), rangées par famille comme dans la barre latérale.
+// Le compteur de non-lus arrive en prop : UN SEUL useChatUnread dans toute
+// l'appli (cf. commentaire plus haut).
+function MoreMenu({ pathname, isCoach, unreadCount }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
-  const isActive = MORE_NAV.some(n => pathname.startsWith(n.href))
-  const { userId, activeBoxId } = useBoxContext()
-  const { unreadCount } = useChatUnread(userId, activeBoxId)
+  const groups = visibleGroups(
+    NAV_GROUPS.map(g => ({ ...g, items: g.items.filter(i => !PRIMARY_HREFS.includes(i.href)) })),
+    isCoach
+  )
+  const isActive = groups.some(g => g.items.some(n => isItemActive(n, pathname)))
 
   useEffect(() => {
     function onClickOutside(e) {
@@ -103,23 +137,84 @@ function MoreMenu({ pathname }) {
         <span>Plus</span>
       </button>
       {open && (
-        <div className="moreMenuPanel">
-          {MORE_NAV.map(n => {
-            const active = pathname.startsWith(n.href)
-            const Icon = n.icon
-            return (
-              <Link key={n.href} href={n.href} className={`moreMenuItem ${active ? 'moreMenuItemActive' : ''}`} onClick={() => setOpen(false)}>
-                <span style={{ position: 'relative' }}>
-                  <Icon active={active} />
-                  {n.href === '/dashboard/chat' && <ChatUnreadDot count={unreadCount} />}
-                </span>
-                {n.label}
-              </Link>
-            )
-          })}
+        <div className="moreMenuPanel" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          {groups.map(group => (
+            <div key={group.label}>
+              <div className="eyebrow" style={{ padding: '8px 12px 2px', fontSize: 10, color: 'var(--chalk-muted)' }}>{group.label}</div>
+              {group.items.map(n => {
+                const active = isItemActive(n, pathname)
+                const Icon = n.icon
+                return (
+                  <Link key={n.href} href={n.href} className={`moreMenuItem ${active ? 'moreMenuItemActive' : ''}`} onClick={() => setOpen(false)}>
+                    <span style={{ position: 'relative' }}>
+                      <Icon active={active} />
+                      {n.chat && <ChatUnreadDot count={unreadCount} />}
+                    </span>
+                    {n.label}
+                  </Link>
+                )
+              })}
+            </div>
+          ))}
         </div>
       )}
     </div>
+  )
+}
+
+// Barre latérale (grand écran uniquement) : toutes les familles, la page
+// courante en évidence, la box et le rôle en bas.
+function SideNav({ pathname, isCoach, unreadCount, boxName }) {
+  const groups = visibleGroups(NAV_GROUPS, isCoach)
+  return (
+    <aside className="sideNav" aria-label="Menu principal">
+      <Link href="/dashboard" className="logo sideLogo">BOX<span>LOG</span></Link>
+      <div className="sideScroll">
+        {groups.map((group, gi) => (
+          <div key={group.label || gi}>
+            {group.label && <div className="sideGroup">{group.label}</div>}
+            {group.items.map(item => {
+              const active = isItemActive(item, pathname)
+              const Icon = item.icon
+              return (
+                <Link key={item.href} href={item.href} className={`sideItem ${active ? 'sideItemActive' : ''}`} aria-current={active ? 'page' : undefined}>
+                  <Icon active={active} />
+                  <span>{item.label}</span>
+                  {item.chat && unreadCount > 0 && <span className="sideBadge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+                </Link>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+      <div className="sideFoot">
+        <div className="sideFootName">{boxName || 'Ma box'}</div>
+        <div className="sideFootRole">{isCoach ? 'Coach' : 'Membre'}</div>
+      </div>
+      {/* Styles à portée globale : le CSS scopé de styled-jsx ne s'applique pas aux <Link> de Next */}
+      <style jsx global>{`
+        .sideNav { display: none; }
+        @media (min-width: 1024px) {
+          .sideNav {
+            display: flex; flex-direction: column; position: fixed; top: 0; left: 0; bottom: 0; width: 248px; z-index: 15;
+            background: var(--bg-card); border-right: 1px solid var(--border); padding: 16px 12px;
+          }
+        }
+        .sideLogo { padding: 0 10px 14px; font-size: 26px; }
+        .sideScroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+        .sideGroup { margin: 16px 10px 4px; font-size: 12px; font-weight: 600; color: var(--chalk-muted); }
+        .sideItem {
+          display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px;
+          color: var(--chalk); font-size: 14px;
+        }
+        .sideItem:hover { background: var(--bg-card-2); }
+        .sideItemActive { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+        .sideBadge { margin-left: auto; padding: 1px 7px; border-radius: 9px; background: var(--accent); color: #16110D; font-size: 11px; font-weight: 700; }
+        .sideFoot { padding: 12px 10px 0; border-top: 1px solid var(--border); }
+        .sideFootName { font-size: 14px; font-weight: 600; }
+        .sideFootRole { font-size: 12px; color: var(--chalk-muted); }
+      `}</style>
+    </aside>
   )
 }
 
@@ -150,9 +245,36 @@ function TopKebabMenu() {
   )
 }
 
-export default function DashboardLayout({ children }) {
+// Réglages de mise en page grand écran, RÉSERVÉS AUX COACHS : tout est accroché
+// à .shellCoach, classe posée sur .shell uniquement si l'utilisateur est coach
+// de la box active. Un adhérent garde l'affichage d'origine (barre du haut +
+// navigation du bas). Les classes .main / .topnav / .mobileNav vivent dans
+// globals.css : on les ajuste ici, uniquement au-delà de 1024 px.
+//   - .main:has(.wideBoard) : la vue semaine en 7 colonnes a besoin de largeur.
+function DesktopLayoutStyles() {
+  return (
+    <style jsx global>{`
+      @media (min-width: 1024px) {
+        .shellCoach { padding-left: 248px; }
+        .shellCoach .mobileNav { display: none; }
+        .shellCoach .topnav .logo { display: none; }
+        .shellCoach .topnav { justify-content: flex-end; }
+        .shellCoach .main { padding-bottom: 48px; }
+        .shellCoach .main:has(.wideBoard) { max-width: 1240px; }
+      }
+    `}</style>
+  )
+}
+
+function DashboardShell({ children }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { userId, activeBoxId, activeBoxName, isCoach, loading } = useBoxContext()
+  // Barre latérale et mise en page grand écran : coach uniquement, une fois le rôle connu.
+  const showSide = !loading && !!isCoach
+  // UN SEUL abonnement Realtime pour le chat (cf. ChatUnreadDot) : le compteur
+  // est transmis à la barre latérale ET au menu "Plus".
+  const { unreadCount } = useChatUnread(userId, activeBoxId)
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -160,35 +282,44 @@ export default function DashboardLayout({ children }) {
   }
 
   return (
+    <div className={`shell ${showSide ? 'shellCoach' : ''}`}>
+      {showSide && <DesktopLayoutStyles />}
+      {showSide && <SideNav pathname={pathname} isCoach={isCoach} unreadCount={unreadCount} boxName={activeBoxName} />}
+
+      <nav className="topnav">
+        <Link href="/dashboard" className="logo">BOX<span>LOG</span></Link>
+        <div className="topnavActions">
+          <NotificationBell />
+          <TopKebabMenu />
+          <button className="btn btnGhost btnSm" onClick={handleLogout} aria-label="Se déconnecter">Déconnexion</button>
+        </div>
+      </nav>
+
+      <BoxErrorBanner />
+
+      <main className="main">{children}</main>
+
+      <nav className="mobileNav" aria-label="Navigation">
+        {PRIMARY_NAV.map(n => {
+          const active = isItemActive(n, pathname)
+          const Icon = n.icon
+          return (
+            <Link key={n.href} href={n.href} className={`mobileNavItem ${active ? 'mobileNavActive' : ''}`}>
+              <Icon active={active} />
+              <span>{n.label}</span>
+            </Link>
+          )
+        })}
+        <MoreMenu pathname={pathname} isCoach={isCoach} unreadCount={unreadCount} />
+      </nav>
+    </div>
+  )
+}
+
+export default function DashboardLayout({ children }) {
+  return (
     <BoxProvider>
-      <div className="shell">
-        <nav className="topnav">
-          <Link href="/dashboard" className="logo">BOX<span>LOG</span></Link>
-          <div className="topnavActions">
-            <NotificationBell />
-            <TopKebabMenu />
-            <button className="btn btnGhost btnSm" onClick={handleLogout} aria-label="Se déconnecter">Déconnexion</button>
-          </div>
-        </nav>
-
-        <BoxErrorBanner />
-
-        <main className="main">{children}</main>
-
-        <nav className="mobileNav" aria-label="Navigation">
-          {PRIMARY_NAV.map(n => {
-            const active = n.href === '/dashboard' ? pathname === n.href : pathname.startsWith(n.href)
-            const Icon = n.icon
-            return (
-              <Link key={n.href} href={n.href} className={`mobileNavItem ${active ? 'mobileNavActive' : ''}`}>
-                <Icon active={active} />
-                <span>{n.label}</span>
-              </Link>
-            )
-          })}
-          <MoreMenu pathname={pathname} />
-        </nav>
-      </div>
+      <DashboardShell>{children}</DashboardShell>
     </BoxProvider>
   )
 }
