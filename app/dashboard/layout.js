@@ -28,12 +28,18 @@ const NAV_GROUPS = [
     { href: '/dashboard/wod', label: 'Le tableau', icon: BoardIcon },
     { href: '/dashboard/chat', label: 'Chat', icon: ChatIcon, chat: true },
     { href: '/dashboard/box', label: 'Ma box', icon: UsersIcon },
-    { href: '/dashboard/coach', label: 'Dashboard coach', icon: ChartIcon, coachOnly: true },
+    { href: '/dashboard/coach', label: 'Dashboard coach', short: 'Coach', icon: ChartIcon, coachOnly: true },
   ] },
 ]
 
 const PRIMARY_HREFS = ['/dashboard', '/dashboard/perso', '/dashboard/programme']
 const PRIMARY_NAV = PRIMARY_HREFS.map(href => NAV_GROUPS.flatMap(g => g.items).find(i => i.href === href))
+
+// Barre du bas version COACH (mobile) : le Chat (avec son badge de non-lus) et
+// le Dashboard coach sortent de "Plus". Les adhérents gardent PRIMARY_HREFS /
+// PRIMARY_NAV ci-dessus, strictement inchangés.
+const COACH_PRIMARY_HREFS = ['/dashboard', '/dashboard/programme', '/dashboard/chat', '/dashboard/coach']
+const COACH_PRIMARY_NAV = COACH_PRIMARY_HREFS.map(href => NAV_GROUPS.flatMap(g => g.items).find(i => i.href === href))
 
 // Page courante : correspondance exacte ou sous-page ("/dashboard/programme/12").
 // Un simple startsWith serait faux : "/dashboard/programme" commence par
@@ -107,11 +113,11 @@ function ChatUnreadDot({ count }) {
 // d'entraînement + Plus), rangées par famille comme dans la barre latérale.
 // Le compteur de non-lus arrive en prop : UN SEUL useChatUnread dans toute
 // l'appli (cf. commentaire plus haut).
-function MoreMenu({ pathname, isCoach, unreadCount }) {
+function MoreMenu({ pathname, isCoach, unreadCount, primaryHrefs = PRIMARY_HREFS }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const groups = visibleGroups(
-    NAV_GROUPS.map(g => ({ ...g, items: g.items.filter(i => !PRIMARY_HREFS.includes(i.href)) })),
+    NAV_GROUPS.map(g => ({ ...g, items: g.items.filter(i => !primaryHrefs.includes(i.href)) })),
     isCoach
   )
   const isActive = groups.some(g => g.items.some(n => isItemActive(n, pathname)))
@@ -263,6 +269,10 @@ function DesktopLayoutStyles() {
         .shellCoach .main { padding-bottom: 48px; }
         .shellCoach .main:has(.wideBoard) { max-width: 1240px; }
       }
+      /* Mobile coach : 5 entrées (4 + Plus) réparties à parts égales */
+      @media (max-width: 1023px) {
+        .shellCoach .mobileNav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      }
     `}</style>
   )
 }
@@ -273,6 +283,9 @@ function DashboardShell({ children }) {
   const { userId, activeBoxId, activeBoxName, isCoach, loading } = useBoxContext()
   // Barre latérale et mise en page grand écran : coach uniquement, une fois le rôle connu.
   const showSide = !loading && !!isCoach
+  // Barre du bas : version coach (Chat + Coach en direct) ou version d'origine pour les adhérents.
+  const primaryNav = showSide ? COACH_PRIMARY_NAV : PRIMARY_NAV
+  const primaryHrefs = showSide ? COACH_PRIMARY_HREFS : PRIMARY_HREFS
   // UN SEUL abonnement Realtime pour le chat (cf. ChatUnreadDot) : le compteur
   // est transmis à la barre latérale ET au menu "Plus".
   const { unreadCount, markRead } = useChatUnread(userId, activeBoxId)
@@ -304,17 +317,24 @@ function DashboardShell({ children }) {
       <main className="main">{children}</main>
 
       <nav className="mobileNav" aria-label="Navigation">
-        {PRIMARY_NAV.map(n => {
+        {primaryNav.map(n => {
           const active = isItemActive(n, pathname)
           const Icon = n.icon
           return (
             <Link key={n.href} href={n.href} className={`mobileNavItem ${active ? 'mobileNavActive' : ''}`}>
-              <Icon active={active} />
-              <span>{n.label}</span>
+              {n.chat ? (
+                <span style={{ position: 'relative' }}>
+                  <Icon active={active} />
+                  <ChatUnreadDot count={unreadCount} />
+                </span>
+              ) : (
+                <Icon active={active} />
+              )}
+              <span>{n.short || n.label}</span>
             </Link>
           )
         })}
-        <MoreMenu pathname={pathname} isCoach={isCoach} unreadCount={unreadCount} />
+        <MoreMenu pathname={pathname} isCoach={isCoach} primaryHrefs={primaryHrefs} unreadCount={primaryHrefs.includes('/dashboard/chat') ? 0 : unreadCount} />
       </nav>
     </div>
     </ChatUnreadProvider>
